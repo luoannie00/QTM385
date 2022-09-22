@@ -25,7 +25,7 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 1
 ```
 
 ```{r}
-setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/#2')
+setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps3')
 c_test <- read.csv('college_test.csv')
 c_train <- read.csv('college_train.csv')
 o_test <- read.csv('office_test.csv')
