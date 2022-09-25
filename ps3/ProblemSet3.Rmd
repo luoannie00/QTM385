@@ -74,6 +74,7 @@ Notes:
   5. These solutions can be found online and in various textbook resources.  I think this is a great exercise for thinking through complex minimization problems, so don't spoil yourself unless you really find yourself stuck.
 
 ## Problem 1 solution:
+OLS:
 $$
 \begin{eqnarray}
 \frac{\partial \left[ \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right)' \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right) \right]}{\partial \boldsymbol{\beta}} &=& 0\\
@@ -87,6 +88,24 @@ $$
 \begin{eqnarray}
 \boldsymbol{\hat{\beta}_{OLS}} &=& \left(\mathcal{I}_P \right)^{-1}\boldsymbol{X}'\boldsymbol{y}\\
 \boldsymbol{\hat{\beta}_{OLS}} &=& \boldsymbol{X}'\boldsymbol{y}
+\end{eqnarray}
+$$
+Ridge:
+$$
+\begin{eqnarray}
+\frac{\partial \left[ \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right)' \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right) + \lambda\sum \limits_{j = 1}^P \beta_j^2 \right]}{\partial \boldsymbol{\beta}} &=& 0\\
+(-2) \boldsymbol{X}' \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right) + 2\lambda\boldsymbol{\beta} &=& 0\\
+\lambda\boldsymbol{\beta} &=& \boldsymbol{X}'\boldsymbol{y} - \boldsymbol{X}'\boldsymbol{X}\boldsymbol{\beta}
+\end{eqnarray}
+$$
+Plug in $\boldsymbol{X'X} = \mathcal{I}_P$ and $\boldsymbol{\hat{\beta}_{OLS}} = \boldsymbol{X}'\boldsymbol{y}$, we get
+$$
+\begin{eqnarray}
+\lambda\boldsymbol{\beta} &=& \boldsymbol{\hat{\beta}_{OLS}} - \mathcal{I}_P\boldsymbol{\beta}\\
+\lambda\boldsymbol{\beta}+\boldsymbol{\beta} &=& \boldsymbol{\hat{\beta}_{OLS}}\\
+\boldsymbol{\hat{\beta}_{Ridge}} &=& \frac{\boldsymbol{\hat{\beta}_{OLS}}}{1+\lambda}
+
+
 \end{eqnarray}
 $$
 
