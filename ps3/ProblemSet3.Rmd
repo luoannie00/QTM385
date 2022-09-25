@@ -104,10 +104,11 @@ $$
 \lambda\boldsymbol{\beta} &=& \boldsymbol{\hat{\beta}_{OLS}} - \mathcal{I}_P\boldsymbol{\beta}\\
 \lambda\boldsymbol{\beta}+\boldsymbol{\beta} &=& \boldsymbol{\hat{\beta}_{OLS}}\\
 \boldsymbol{\hat{\beta}_{Ridge}} &=& \frac{\boldsymbol{\hat{\beta}_{OLS}}}{1+\lambda}
-
-
 \end{eqnarray}
 $$
+LASSO:
+For each $\beta_j$:
+
 
 ## Problem 2: Applying Ridge and LASSO (35 pts)
 
