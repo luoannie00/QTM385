@@ -73,6 +73,23 @@ Notes:
   
   5. These solutions can be found online and in various textbook resources.  I think this is a great exercise for thinking through complex minimization problems, so don't spoil yourself unless you really find yourself stuck.
 
+## Problem 1 solution:
+$$
+\begin{eqnarray}
+\frac{\partial \left[ \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right)' \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right) \right]}{\partial \boldsymbol{\beta}} &=& 0\\
+(-2) \boldsymbol{X}' \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right) &=& 0\\
+\boldsymbol{X}'\boldsymbol{y} - \boldsymbol{X}'\boldsymbol{X}\boldsymbol{\beta} &=& 0\\
+\boldsymbol{\hat{\beta}_{OLS}} &=& \left(\boldsymbol{X}'\boldsymbol{X} \right)^{-1}\boldsymbol{X}'\boldsymbol{y}\\
+\end{eqnarray}
+$$
+Since we are assuming orthonormal columns, we plug in $\boldsymbol{X'X} = \mathcal{I}_P$
+$$
+\begin{eqnarray}
+\boldsymbol{\hat{\beta}_{OLS}} &=& \left(\mathcal{I}_P \right)^{-1}\boldsymbol{X}'\boldsymbol{y}\\
+\boldsymbol{\hat{\beta}_{OLS}} &=& \boldsymbol{X}'\boldsymbol{y}
+\end{eqnarray}
+$$
+
 ## Problem 2: Applying Ridge and LASSO (35 pts)
 
 Ridge and LASSO are great methods for parsing through data sets with lots of predictors to find:
