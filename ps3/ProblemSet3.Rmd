@@ -108,6 +108,33 @@ $$
 $$
 LASSO:
 For each $\beta_j$:
+$$
+\begin{eqnarray}
+\hat{\beta}_{j,LASSO} &=& \underset{\boldsymbol \beta_j}{\text{argmin  }} (y_j - \mathbf x_j \beta_j)^2 + \lambda * |\beta_j|\\
+\frac{\partial \left[ \hat{\beta}_{j,LASSO} \right]}{\partial {\beta_j}} &=& 2\left( -\boldsymbol x_j \right)'\left(y_j-\boldsymbol {x_j} \beta_j \right)+\lambda * \text{sign} \left(\beta_j \right) = 0\\
+\lambda * \text{sign} \left(\beta_j \right) &=& 2\boldsymbol{x_j}'y_j-2\boldsymbol {x_j}'\boldsymbol {x_j} \beta_j
+\end{eqnarray}
+$$
+Plug in $\boldsymbol{x_j'x_j} = \mathcal{I}_1$ and ${\hat{\beta}_{j,OLS}} = \boldsymbol{x_j}'{y_j}$, we get
+$$
+\begin{eqnarray}
+\lambda * \text{sign} \left(\beta_j \right) &=& 2\hat{\beta}_{j,OLS}-2\mathcal{I}_1 \beta_j\\
+\beta_j &=& \hat{\beta}_{j,OLS} - \frac{\lambda}{2}\text{sign} \left(\beta_j \right)
+\end{eqnarray}
+$$
+Set constant $\lambda$ to be $\frac{\lambda}{2}$, and summing up $\beta_j$, we get
+$$
+\begin{eqnarray}
+\hat {\boldsymbol \beta}_{LASSO} &=& \hat{\boldsymbol{\beta}}_{OLS} - \lambda*\text{sign} \left(\beta_j \right)
+\end{eqnarray}
+$$
+When $\hat{\boldsymbol{\beta}}_{OLS} > 0$, $\hat {\boldsymbol \beta}_{LASSO} = \hat{\boldsymbol{\beta}}_{OLS} - \lambda$; when $\hat{\boldsymbol{\beta}}_{OLS} < 0$, $\hat {\boldsymbol \beta}_{LASSO} = \hat{\boldsymbol{\beta}}_{OLS} + \lambda$.
+Therefore, we get
+$$
+\begin{eqnarray}
+\hat {\boldsymbol \beta}_{LASSO} &=& \text{sign} \left(\hat{\boldsymbol{\beta}}_{OLS} \right) * \left(|\hat{\boldsymbol{\beta}}_{OLS}| - \lambda \right)
+\end{eqnarray}
+$$
 
 
 ## Problem 2: Applying Ridge and LASSO (35 pts)
