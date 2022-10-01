@@ -23,6 +23,7 @@ library(tidyverse)
 library(glmnet)
 library(caret)
 library(Metrics)
+library(splines)
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
 
