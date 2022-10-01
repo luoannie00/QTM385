@@ -377,10 +377,10 @@ Notes:
 $$
 \begin{eqnarray}
 y_i &=& \alpha + \beta_2 h_2(x_i) + \beta_3 h_3(x_i) + \beta_4 h_4(x_i) + \sum \limits_{k = 5}^{K} \beta_k h_k(x_i) + \epsilon_i\\
-y_i &=& \beta_2x_i + \beta_3 x_i^2 + \beta_4 x_i^3 +  \sum \limits_{k = 1}^{K} \beta_{k+4} (x_i - \xi_k)^3 + \epsilon_i\\
-\frac{dy_i}{dxi} &=& \beta_2 + 2\beta_3x_i + 3\beta_4 x_i^2 + 3\sum \limits_{k = 1}^{K} \beta_{k+4} (x_i - \xi_k)^2\\
-\frac{d^2y_i}{dxi^2} &=& 2\beta_3 + 6\beta_4 x_i + 6\sum \limits_{k = 1}^{K} \beta_{k+4} (x_i - \xi_k)\\
-\frac{d^3y_i}{dxi^3} &=& 6\beta_4 + 6\sum \limits_{k = 1}^{K} \beta_{k+4}\\
+y_i &=& \alpha + \beta_2x_i + \beta_3 x_i^2 + \beta_4 x_i^3 +  \sum \limits_{k = 1}^{K} \beta_{k+4} (x_i - \xi_k)^3 + \epsilon_i\\
+\frac{dy_i}{dx_i} &=& \beta_2 + 2\beta_3x_i + 3\beta_4 x_i^2 + 3\sum \limits_{k = 1}^{K} \beta_{k+4} (x_i - \xi_k)^2\\
+\frac{d^2y_i}{dx_i^2} &=& 2\beta_3 + 6\beta_4 x_i + 6\sum \limits_{k = 1}^{K} \beta_{k+4} (x_i - \xi_k)\\
+\frac{d^3y_i}{dx_i^3} &=& 6\beta_4 + 6\sum \limits_{k = 1}^{K} \beta_{k+4}\\
 \end{eqnarray}
 $$
 Since the function is three-times differentiable, the second derivative of the function is continuous. Since the function has a second derivative, it's twice differentiable, which proves that the function's first derivative is continuous. Since the function is continuous in the first and second derivative for all $x_i$, the function is continuous in the first and second derivative at the knots.
