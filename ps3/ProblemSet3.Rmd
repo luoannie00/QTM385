@@ -175,7 +175,13 @@ Note: You don't need to try to perform any methods of subset selection in this s
 
 ### Part 1 solution:
 ```{r p2p1}
-o_train$episode_name <- NULL
+o_train$episode_name <- NULL #feature that's observation specific is taken out
+#dummied-out variables
+o_train$season <- factor(o_train$season)
+dummy_o_train <- caret::dummyVars("~.", data = o_train)
+o_train <- data.frame(predict(dummy_o_train, newdata = o_train))
+
+#OLS
 p2p1_m <- lm(imdb_rating~., data = o_train)
 
 #LOOCV
@@ -195,9 +201,9 @@ ggplot(data = cf, aes(x = rownames.cf., y = Estimate)) +
  axis.title.x = element_text(face="bold", colour="red", size = 12),
  axis.title.y = element_text(face="bold", colour="red", size = 12))
 ```
-From the plot, we see that predictors season7, season5, season4, season3, season2, greg_daniels, and b_j_novak seem important, while the rest don't.
+From the plot, we see that predictors season3, season1, paul_lieberstein, mindy_kaling, justin_spitzer, greg_daniels, and b_j_novak seem important, while the rest don't.
 ```{r p2p1}
-p2p1_imp_pred <- subset(o_train, select=c(season, greg_daniels, b_j_novak, imdb_rating))
+p2p1_imp_pred <- subset(o_train, select=c(season, paul_lieberstein, greg_daniels, b_j_novak, imdb_rating))
 p2p1_imp_pred <- filter(p2p1_imp_pred, season == "Season 7" | season == "Season 5" | season == "Season 4" | season == "Season 3" | season == "Season 2")
 p2p1_imp_pred_m <- lm(imdb_rating~., data = p2p1_imp_pred)
 #LOOCV
@@ -215,9 +221,6 @@ Create a plot that demonstrates the regression coefficients for the ridge regres
 
 ### Part 2 solution:
 ```{r p2p2}
-o_train$season <- factor(o_train$season)
-dummy_o_train <- caret::dummyVars("~.", data = o_train)
-o_train <- data.frame(predict(dummy_o_train, newdata = o_train))
 p2p2_pred <- as.matrix(o_train[,-38])
 p2p2_out <- as.matrix(o_train$imdb_rating)
 p2p2_ridgem <- glmnet::glmnet(x = p2p2_pred, y = p2p2_out, family = "gaussian", alpha = 0) #100 possible values of lambda
