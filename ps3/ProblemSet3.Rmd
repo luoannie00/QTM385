@@ -19,17 +19,16 @@ urlcolor: blue
 ---
 
 ```{r, include=FALSE}
-library(ggplot2)
-library(data.table)
-library(dplyr)
+library(tidyverse)
 library(glmnet)
 library(caret)
+library(Metrics)
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
 
 ```{r}
-#setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps3')
-setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/ps3')
+setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps3')
+#setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/ps3')
 rm(list = ls())
 c_test <- read.csv('college_test.csv')
 c_train <- read.csv('college_train.csv')
@@ -44,6 +43,8 @@ Please use the intro to RMarkdown posted in the Intro module and my .Rmd file as
 Your final deliverable should be two files: 1) a .Rmd/.ipynb file and 2) either a rendered HTML file or a PDF.  Students can complete this assignment in groups of up to 3.  Please identify your collaborators at the top of your document.  All students should turn in a copy of the solutions, but your solutions can be identical to those of your collaborators.
 
 This assignment is due by October 3rd, 2022 at 11:59 PM EST.  
+
+Collaborators: Billy Ge, Latifa Tan, Annie Luo
 
 ***
 
@@ -79,6 +80,7 @@ Notes:
   5. These solutions can be found online and in various textbook resources.  I think this is a great exercise for thinking through complex minimization problems, so don't spoil yourself unless you really find yourself stuck.
 
 ## Problem 1 solution:
+
 OLS:
 $$
 \begin{eqnarray}
@@ -175,41 +177,48 @@ Note: You don't need to try to perform any methods of subset selection in this s
 
 ### Part 1 solution:
 ```{r p2p1}
-o_train$episode_name <- NULL #feature that's observation specific is taken out
-#dummied-out variables
-o_train$season <- factor(o_train$season)
-dummy_o_train <- caret::dummyVars("~.", data = o_train)
-o_train <- data.frame(predict(dummy_o_train, newdata = o_train))
+#delete variable episode_name
+o_train <- o_train %>% select(-episode_name)
 
-#OLS
-p2p1_m <- lm(imdb_rating~., data = o_train)
+#split variable season into 9 variables
+dummy_o_train <- caret::dummyVars("~.", data=o_train)
+o_train <- data.frame(predict(dummy_o_train, newdata=o_train))
+
+#full model
+p2p1_m <- lm(imdb_rating ~ ., data=o_train)
 
 #LOOCV
-lm_pred_metrics <- function(fit_model){
+lm_pred_metrics <- function(fit_model) {
   LOOCV <- mean((fit_model$residuals / (1-hatvalues(fit_model)))^2)
-  return(c("LOOCV" = LOOCV))
+  return (LOOCV)
 }
 lm_pred_metrics(p2p1_m) #LOOCV is 0.2343854
 
-cf <-coef(summary(p2p1_m,complete = TRUE))
+#plot
+cf <- coef(summary(p2p1_m, complete=TRUE))
 cf <- data.frame(rownames(cf), cf)
-ggplot(data = cf, aes(x = rownames.cf., y = Estimate)) +
- geom_bar(stat = "identity", width = 0.75) +
- coord_flip() +
- labs(x = "\n Features \n", y = "Coefficient Estimate \n") +
- theme(plot.title = element_text(hjust = 0.5), 
- axis.title.x = element_text(face="bold", colour="red", size = 12),
- axis.title.y = element_text(face="bold", colour="red", size = 12))
+
+ggplot(data=cf, aes(x=rownames.cf., y=Estimate)) +
+  geom_bar(stat="identity", width=0.75) + coord_flip() +
+  labs(x="Features", y="Coefficient Estimate") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.title.x = element_text(face="bold", colour="red", size = 12),
+        axis.title.y = element_text(face="bold", colour="red", size = 12)) 
 ```
 From the plot, we see that predictors season3, season1, paul_lieberstein, mindy_kaling, justin_spitzer, greg_daniels, and b_j_novak seem important, while the rest don't.
+
 ```{r p2p1}
-p2p1_imp_pred <- subset(o_train, select=c(season, paul_lieberstein, greg_daniels, b_j_novak, imdb_rating))
-p2p1_imp_pred <- filter(p2p1_imp_pred, season == "Season 7" | season == "Season 5" | season == "Season 4" | season == "Season 3" | season == "Season 2")
-p2p1_imp_pred_m <- lm(imdb_rating~., data = p2p1_imp_pred)
+#subset of important predictors
+p2p1_imp_pred <- o_train %>% select(seasonSeason.3, seasonSeason.1, paul_lieberstein, mindy_kaling, justin_spitzer, greg_daniels, b_j_novak, imdb_rating)
+
+#important predictors model
+p2p1_imp_pred_m <- lm(imdb_rating ~ ., data=p2p1_imp_pred)
+
 #LOOCV
-lm_pred_metrics(p2p1_imp_pred_m) #LOOCV is 0.1831386
+lm_pred_metrics(p2p1_imp_pred_m) #LOOCV is 0.2543553
 ```
-The LOOCV of this new model is slightly smaller than full model.
+The LOOCV of the important predictors model is slightly larger than the full model.
 
 ### Part 2 (10 pts)
 
@@ -223,9 +232,37 @@ Create a plot that demonstrates the regression coefficients for the ridge regres
 ```{r p2p2}
 p2p2_pred <- as.matrix(o_train[,-38])
 p2p2_out <- as.matrix(o_train$imdb_rating)
-p2p2_ridgem <- glmnet::glmnet(x = p2p2_pred, y = p2p2_out, family = "gaussian", alpha = 0) #100 possible values of lambda
-cv.glmnet(x = p2p2_pred, y = p2p2_out, family = "gaussian", alpha = 0, nfolds = 10, type.measure = "mse")
+
+#100 possible values of lambda
+p2p2_ridgem <- glmnet::glmnet(x=p2p2_pred, y=p2p2_out, family="gaussian", alpha=0, nlambda=100)
+print(p2p2_ridgem)
+
+p2p2_cv_ridgem <- cv.glmnet(x=p2p2_pred, y=p2p2_out, family="gaussian", alpha=0, nfolds=10, type.measure="mse")
+plot(p2p2_cv_ridgem)
+print(p2p2_cv_ridgem)
+
+p2p2_optimal_ridgem <- glmnet::glmnet(x=p2p2_pred, y=p2p2_out, family="gaussian", alpha=0, lambda=0.74)
+#plot
+cf1 <- c()
+cf2 <- c()
+for (i in 1:37) {
+  cf1 <- append(cf1, rownames(p2p2_optimal_ridgem$beta)[i])
+  cf2 <- append(cf2, unname(p2p2_optimal_ridgem$beta)[i])
+}
+cf <- data.frame(cf1, cf2)
+
+ggplot(data=cf, aes(x=cf1, y=cf2)) +
+  geom_bar(stat="identity", width=0.75) + coord_flip() +
+  labs(x="Features", y="Coefficient Estimate") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.title.x = element_text(face="bold", colour="red", size = 12),
+        axis.title.y = element_text(face="bold", colour="red", size = 12))
 ```
+The value of lambda that minimizes the expected prediction error is 0.74 according to the 10 fold cross validation. I stick with the suggested lambda value for the model, because based on the plot, expected prediction error picks up pretty obviously as lambda increases.
+
+Based on the plot, the important predictors are season9, season8, season7, season6, season5,
+season4, season3, season1, randall_einhorn, paul_lieberstein, paul_feig, greg_daniels, and gene_stupnitsky, whereas the rest of the predictors are not.
 
 ### Part 3 (10 pts)
 
@@ -235,13 +272,83 @@ Using $10$-fold cross validation, find a reasonable value of $\lambda$ that shou
 
 Create a plot that demonstrates the regression coefficients for the LASSO regression with your optimal choice of $\lambda$.  Which predictors are important?  Which ones are not?
 
+```{r p2p3}
+p2p3_pred <- as.matrix(o_train[,-38])
+p2p3_out <- as.matrix(o_train$imdb_rating)
+
+#100 possible values of lambda
+p2p3_lassom <- glmnet::glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, nlambda=100)
+print(p2p3_lassom)
+
+p2p3_cv_lassom <- cv.glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, nfolds=10, type.measure="mse")
+plot(p2p3_cv_lassom)
+print(p2p3_cv_lassom)
+
+p2p3_optimal_lassom <- glmnet::glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, lambda=0.03343)
+#plot
+cf1 <- c()
+cf2 <- c()
+for (i in 1:37) {
+  cf1 <- append(cf1, rownames(p2p3_optimal_lassom$beta)[i])
+  cf2 <- append(cf2, unname(p2p3_optimal_lassom$beta)[i])
+}
+cf <- data.frame(cf1, cf2)
+
+ggplot(data=cf, aes(x=cf1, y=cf2)) +
+  geom_bar(stat="identity", width=0.75) + coord_flip() +
+  labs(x="Features", y="Coefficient Estimate") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.title.x = element_text(face="bold", colour="red", size = 12),
+        axis.title.y = element_text(face="bold", colour="red", size = 12))
+```
+The value of lambda that minimizes the expected prediction error is 0.03343 according to the 10 fold cross validation. I stick with the suggested lambda value for the model, because based on the plot, expected prediction error picks up pretty obviously as lambda increases.
+
+Based on the plot, the important predictors are season8, season6, season3, season1, paul_feig, and greg_daniels, whereas the rest of the predictors are not.
+
 ### Part 4 (5 pts)
 
 Which of OLS with all predictors, OLS with your chosen subset of predictors, Ridge, or LASSO has the smallest cross validation estimate of expected prediction error?  Do you have any intuition as to why this result occurs?
 
 Using the optimal models from each step, compute an estimate of the expected prediction error using the heldout test data.  Does the same relationship hold?
 
-Compare your plots for the regression coefficients for the full OLS model, the ridge regression, and LASSO regression.  How do LASSO and Ridge improve the expected prediction error for this problem?  
+Compare your plots for the regression coefficients for the full OLS model, the ridge regression, and LASSO regression.  How do LASSO and Ridge improve the expected prediction error for this problem?
+
+```{r p2p4}
+data.frame(
+  epe_full_lm = lm_pred_metrics(p2p1_m),
+  epe_subset_lm = lm_pred_metrics(p2p1_imp_pred_m),
+  epe_optimal_ridge = min(p2p2_cv_ridgem$cvm),
+  epe_optimal_lasso = min(p2p3_cv_lassom$cvm))
+```
+According to the above comparison, the optimal ridge and lasso models have similar performance on expected prediction errors that are both lower than the OLS models.
+
+```{r p2p4}
+#delete variable episode_name
+o_test <- o_test %>% select(-episode_name)
+
+#split variable season into 9 variables
+dummy_o_test <- caret::dummyVars("~.", data=o_test)
+o_test <- data.frame(predict(dummy_o_test, newdata=o_test))
+
+p2p4_pred_mat <- as.matrix(o_test[,-38])
+p2p4_pred_df_full <- o_test[,-38]
+p2p4_pred_df_imp <- o_test %>% select(seasonSeason.3, seasonSeason.1, paul_lieberstein, mindy_kaling, justin_spitzer, greg_daniels, b_j_novak, imdb_rating)
+
+#predictions
+o_test$full_lm <- predict(p2p1_m, newdata=p2p4_pred_df_full)
+o_test$subset_lm <- predict(p2p1_imp_pred_m, newdata=p2p4_pred_df_imp)
+o_test$optimal_ridge <- predict(p2p2_optimal_ridgem, newx=p2p4_pred_mat)
+o_test$optimal_lasso <- predict(p2p3_optimal_lassom, newx=p2p4_pred_mat)
+
+#mse comparison
+data.frame(
+  mse_full_lm = mse(o_test$imdb_rating, o_test$full_lm),
+  mse_subset_lm = mse(o_test$imdb_rating, o_test$subset_lm),
+  mse_optimal_ridge = mse(o_test$imdb_rating, o_test$optimal_ridge),
+  mse_optimal_lasso = mse(o_test$imdb_rating, o_test$optimal_lasso))
+```
+Yes, the same result holds in the heldout test data, where the optimal ridge and lasso models perform better than full and subset OLS models.
 
 ## Problem 3: A Nifty Identity for Cubic Regression Splines (15 pts)
 
@@ -265,18 +372,6 @@ Notes:
   2. With an appropriate argument about the relationship between continuity in the 1st and 2nd derivatives, you don't need to show continuity on the first derivatives.
   
   3. Remember that we can show continuity by proving that the left and right limits of a function are equivalent!
-
-## Problem 3 solution:
-$$
-\begin{eqnarray}
-y_i &=& \alpha + \beta_2 h_2(x_i) + \beta_3 h_3(x_i) + \beta_4 h_4(x_i) + \sum \limits_{k = 5}^{K} \beta_k h_k(x_i) + \epsilon_i\\
-y_i &=& \beta_2x_i + \beta_3 x_i^2 + \beta_4 x_i^3 +  \sum \limits_{k = 1}^{K} \beta_{k+4} (x_i - \xi_k)^3 + \epsilon_i\\
-\frac{dy_i}{dxi} &=& \beta_2 + 2\beta_3x_i + 3\beta_4 x_i^2 + 3\sum \limits_{k = 1}^{K} \beta_{k+4} (x_i - \xi_k)^2\\
-\frac{d^2y_i}{dxi^2} &=& 2\beta_3 + 6\beta_4 x_i + 6\sum \limits_{k = 1}^{K} \beta_{k+4} (x_i - \xi_k)\\
-\frac{d^3y_i}{dxi^3} &=& 6\beta_4 + 6\sum \limits_{k = 1}^{K} \beta_{k+4}\\
-\end{eqnarray}
-$$
-Since the function is three-times differentiable, the second derivative of the function is continuous. Since the function has a second derivative, it's twice differentiable, which proves that the function's first derivative is continuous. Since the function is continuous in the first and second derivative for all $x_i$, the function is continuous in the first and second derivative at the knots.
 
 ## Problem 4: Nonlinear Regression Methods (35 pts)
 
