@@ -28,9 +28,9 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 1
 ```
 
 ```{r}
-setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps3')
+#setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps3')
 #setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/ps3')
-rm(list = ls())
+#rm(list = ls())
 c_test <- read.csv('college_test.csv')
 c_train <- read.csv('college_train.csv')
 o_test <- read.csv('office_test.csv')
@@ -274,18 +274,18 @@ Using $10$-fold cross validation, find a reasonable value of $\lambda$ that shou
 Create a plot that demonstrates the regression coefficients for the LASSO regression with your optimal choice of $\lambda$.  Which predictors are important?  Which ones are not?
 
 ```{r p2p3}
-p2p3_pred <- as.matrix(o_train[,-38])
-p2p3_out <- as.matrix(o_train$imdb_rating)
+p2p3_pred <- data.matrix(o_train[,-38])
+p2p3_out <- data.matrix(o_train$imdb_rating)
 
 #100 possible values of lambda
-p2p3_lassom <- glmnet::glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, nlambda=100)
+p2p3_lassom <- glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, nlambda=100)
 print(p2p3_lassom)
 
 p2p3_cv_lassom <- cv.glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, nfolds=10, type.measure="mse")
 plot(p2p3_cv_lassom)
 print(p2p3_cv_lassom)
 
-p2p3_optimal_lassom <- glmnet::glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, lambda=0.03343)
+p2p3_optimal_lassom <- glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, lambda=0.03343)
 #plot
 cf1 <- c()
 cf2 <- c()
@@ -397,28 +397,20 @@ Note: I would recommend just recoding `Outstate = log(Outstate)` right at the be
 ### Part 1 (10 pts)
 
 Let's start by looking at a single predictor - the student/faculty ratio `S.F.Ratio`.  Plot log out of state tuition against the student/faculty ratio.  Does this look linear?
-
-Using a measure of expected prediction error appropriate for a standard linear model, find the order of global polynomial that minimizes EPE.  Be sure to note your choice and why you made it.  Using this value, train your model on the full training set and plot the prediction curve implied by the polynomial model on your graph.
-
-Next, estimate a cubic natural spline and a smoothing spline using the entire training data.  For the natural spline, you need to choose the number of knots or degrees of freedom.  I would recommend setting these to 5 to start and playing with it until you get something that looks right.  For the smoothing spline, you should choose the final form using a built-in cross-validation method (most likely GCV).  Add the prediction curve to your plot.  How do the drawn curves differ between methods?
-
-Finally, use your polynomial model and splines to create predictions for the test set and quantify the mean squared error for the test set.  Which model performs best?  Worst?  Provide some rationale for this outcome.
-
 ```{r p4p1, warning=FALSE}
 #initial recoding: use c_train_q4 moving on for consistence
 c_train_q4 <- c_train
-c_train_q4$Outstate <- log(c_train_q4$Outstate)
+c_train_q4$Outstate <- log(c_train$Outstate)
 
-approachPlot <- qplot(x=S.F.Ratio, y=Outstate, data=c_train_q4, geom=c("point","smooth"), 
-                      ylab="out of state tuition", xlab="student/faculty ratio")
+approachPlot <- qplot(x=S.F.Ratio, y=Outstate, data=c_train_q4, geom=c("point","smooth"), ylab="out of state tuition", xlab="student/faculty ratio")
 approachPlot
 
 # It looks quite linear, but could also be a second/third degree polynomial relationship. Compare the first smooth graph with the second one plotting in linear model, we can see that the relationship has a linear trend.
-lmApprochPlot <- qplot(x=S.F.Ratio, y=Outstate, data=c_train_q4, geom=c("point","smooth"), 
-                       method="lm", ylab="out of state tuition", xlab="student/faculty ratio")
+lmApprochPlot <- qplot(x=S.F.Ratio, y=Outstate, data=c_train_q4, geom=c("point","smooth"), method="lm", ylab="out of state tuition", xlab="student/faculty ratio")
 lmApprochPlot
 ```
 
+Using a measure of expected prediction error appropriate for a standard linear model, find the order of global polynomial that minimizes EPE.  Be sure to note your choice and why you made it.  Using this value, train your model on the full training set and plot the prediction curve implied by the polynomial model on your graph.
 ```{r p4p1}
 # we reuse the function from problem set 2 for the wealth of non-simulation based estimates of the expected prediction error to make this decision
 lm_pred_metrics <- function(fit_model) {
@@ -462,30 +454,36 @@ p4p1_model_10 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,10))
 p4p1_df <- t(cbind(lm_pred_metrics(p4p1_model_1), lm_pred_metrics(p4p1_model_2), lm_pred_metrics(p4p1_model_3), lm_pred_metrics(p4p1_model_4), lm_pred_metrics(p4p1_model_5), lm_pred_metrics(p4p1_model_6), lm_pred_metrics(p4p1_model_7), lm_pred_metrics(p4p1_model_8), lm_pred_metrics(p4p1_model_9), lm_pred_metrics(p4p1_model_10)))
 num <- c(1:10)
 p4p1_df <- data.frame(num, p4p1_df)
-
+#plot LOOCV for various degree of polynomial
 ggplot(data=p4p1_df) + 
   geom_point(aes(x=num, y=LOOCV.1)) + 
   geom_line(aes(x=num, y=LOOCV.1)) +
   xlab("degree polynomial") + ylab('LOOCV') +
   theme_bw()
+# We use LOOCV as our measure of EPE and find that third order of global polynomial that minimizes EPE. We choose LOOCV as there is less worry about bias and variance than other approaches and it's asymptotically unbiased for the  the EPE.From the graph above, we could see that the LOOCV reaches minimum for degree polynomial=3.
 ```
 
 ```{r p4p1}
-# We use LOOCV as our measure of EPE and find that third order of global polynomial that minimizes EPE. We choose LOOCV as there is less worry about bias and variance than other approaches and it's asymptotically unbiased for the  the EPE.From the graph above, we could see that the LOOCV reaches minimum for degree polynomial=3.
-optimalModel <- lm(c_train_q4$Outstate ~ poly(c_train_q4$S.F.Ratio,3))
-predResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,
-                         predOutState=optimalModel$fitted.values,
+#optimal polynomial model 
+#train the model with third degree of polynomial
+optimalPolyModel <- lm(c_train_q4$Outstate ~ poly(c_train_q4$S.F.Ratio,3))
+polyPredResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,
+                         predOutState=optimalPolyModel$fitted.values,
                          originalOutState=c_train_q4$Outstate)
 
-predResultPlot <- ggplot(data=predResult) +
+#plot our polynomial model
+polyPredResultPlot <- ggplot(data=polyPredResult) +
   geom_point(aes(x=S.F.Ratio, y=predOutState, col='prediction')) +
   geom_point(aes(x=S.F.Ratio, y=originalOutState, col='original')) +
   scale_colour_manual(name="Legend", values=c('black','red')) +
   ylab('OutState') + theme_bw()
-predResultPlot
+polyPredResultPlot
 ```
 
+Next, estimate a cubic natural spline and a smoothing spline using the entire training data.  For the natural spline, you need to choose the number of knots or degrees of freedom.  I would recommend setting these to 5 to start and playing with it until you get something that looks right.  For the smoothing spline, you should choose the final form using a built-in cross-validation method (most likely GCV).  Add the prediction curve to your plot.  How do the drawn curves differ between methods?
 ```{r p4p1}
+#natural spline(cubic)
+#find the optimal df with our measure of EPE
 p4_1_num <- seq(1,20,1)
 p4_1_aic <- c()
 p4_1_bic <- c()
@@ -499,11 +497,9 @@ for (i in 1:20) {
   p4_1_bic <- append(p4_1_bic, tempCheck[2])
   p4_1_loocv <- append(p4_1_loocv, tempCheck[3])
 }
-
 p4_1_dat <- data.frame(p4_1_num, p4_1_aic, p4_1_bic, p4_1_loocv)
-```
 
-```{r p4p1}
+#plot how each df perform with each measure of EPE
 ggplot(data=p4_1_dat) +
   geom_point(aes(x=p4_1_num, y=p4_1_aic)) +
   geom_line(aes(x=p4_1_num, y=p4_1_aic)) +
@@ -524,12 +520,13 @@ ggplot(data=p4_1_dat) +
 ```
 
 ```{r p4p1}
+#optimal Natural Spline model
 optimalCubicModel <- lm(Outstate ~ ns(S.F.Ratio,df=4), data=c_train_q4)
-predResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,
+nsPredResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,
                          predOutState=optimalCubicModel$fitted.values,
                          originalOutState=c_train_q4$Outstate)
 
-predResultPlot <- ggplot(data=predResult) +
+predResultPlot <- ggplot(data=nsPredResult) +
   geom_point(aes(x=S.F.Ratio, y=predOutState, col='prediction')) +
   geom_point(aes(x=S.F.Ratio, y=originalOutState, col='original')) +
   scale_colour_manual(name="Legend", values=c('black','red')) +
@@ -538,22 +535,56 @@ predResultPlot
 ```
 
 ```{r p4p1}
+#optimal smoothing spline model
 optimalSSModel <- smooth.spline(x=c_train_q4$S.F.Ratio, y=c_train_q4$Outstate)
-predResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,
-                         predOutState=predict(optimalSSModel, x=c_train_q4$S.F.Ratio),
-                         originalOutState=c_train_q4$Outstate)
-predResultPlot <- ggplot(data=predResult) +
+ssPredResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,predOutState=predict(optimalSSModel, x=c_train_q4$S.F.Ratio),                         originalOutState=c_train_q4$Outstate)
+predResultPlot <- ggplot(data=ssPredResult) +
   geom_point(aes(x=S.F.Ratio, y=predOutState.y, col='prediction')) +
   geom_point(aes(x=S.F.Ratio, y=originalOutState, col='original')) +
   scale_colour_manual(name="Legend", values=c('black','red')) +
   ylab('OutState') + theme_bw()
 predResultPlot
 ```
+```{r}
+#Comparing  the optimal model we got through cubic natural spline and smoothing spline, we can see that optimal smoothing spline model goes more smoothly than the natural spline one, especially on the left end where S.F.ratio smaller than 15.
+```
+
+Finally, use your polynomial model and splines to create predictions for the test set and quantify the mean squared error for the test set.  Which model performs best?  Worst?  Provide some rationale for this outcome.
+```{r}
+#recode testing dataframe
+c_test_q4 <- c_test
+c_test_q4$Outstate <- log(c_test$Outstate)
+#train three optimal models and calculate mse
+test_poly_MSE = mse(predict(optimalPolyModel,x=c_test_q4$S.F.Ratio),c_test_q4$Outstate)
+test_ns_MSE = mse(predict(optimalCubicModel,x=c_test_q4$S.F.Ratio),c_test_q4$Outstate)
+ssTestPredResult <- data.frame(predOutState=predict(optimalSSModel, x=c_test_q4$S.F.Ratio),                         originalOutState=c_test_q4$Outstate)
+test_ss_MSE = mse(ssTestPredResult$predOutState.y,c_test_q4$Outstate)
+table<-data.frame(polyTestResult=test_poly_MSE,naturalSplineResult=test_ns_MSE,smoothingSplineResult=test_ss_MSE)
+table
+```
+```{r}
+#From the table above, we can see that the smoothing spline model works the best with the test data. Natural spline model is the worst in term of mse, but polynomial model's mse is also close to the one for natural spline. Since smoothing spline use more knots for spline and have penalization for variation, it makes sense that it performs better than the natural spline.
+```
 
 
 ### Part 2 (10 pts)
 
 Now, let's consider the multivariate case with all of the predictors.  Let's improve on the standard linear model by using LASSO to do some variable selection and shrinkage.  Fit the LASSO model to the training data and use K-fold cross validation to select a value of $\lambda$.  Be sure to explain why you made the choice that you did.  How many variables are used in the "optimal" model?  Be sure to record the optimal $\lambda$ for later use.
+
+```{r}
+# set things as matrix
+lasso_predictor <- data.matrix(c_train_q4[,-9])
+lasso_outcome <- data.matrix(c_train_q4$Outstate)
+
+c_lasso <- glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, nlambda=100)
+print(c_lasso)
+c_lasso_cv <- cv.glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, nfolds=10, type.measure="mse")
+#plot(p2p3_cv_lassom)
+print(c_lasso_cv)
+
+#c_optimal_lassom <- glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, lambda=0.03343)
+```
+
 
 ### Part 3 (10 pts)
 
