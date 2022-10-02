@@ -231,11 +231,11 @@ Create a plot that demonstrates the regression coefficients for the ridge regres
 
 ### Part 2 solution:
 ```{r p2p2}
-p2p2_pred <- as.matrix(o_train[,-38])
-p2p2_out <- as.matrix(o_train$imdb_rating)
+p2p2_pred <- data.matrix(o_train[,-38])
+p2p2_out <- data.matrix(o_train$imdb_rating)
 
 #100 possible values of lambda
-p2p2_ridgem <- glmnet::glmnet(x=p2p2_pred, y=p2p2_out, family="gaussian", alpha=0, nlambda=100)
+p2p2_ridgem <- glmnet(x=p2p2_pred, y=p2p2_out, family="gaussian", alpha=0, nlambda=100)
 print(p2p2_ridgem)
 
 p2p2_cv_ridgem <- cv.glmnet(x=p2p2_pred, y=p2p2_out, family="gaussian", alpha=0, nfolds=10, type.measure="mse")
