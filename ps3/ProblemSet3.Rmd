@@ -28,7 +28,7 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 1
 ```
 
 ```{r}
-#setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps3')
+setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps3')
 #setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/ps3')
 rm(list = ls())
 c_test <- read.csv('college_test.csv')
@@ -395,34 +395,47 @@ As always, the test set is intended to be used only for quantifying expected pre
 Note: I would recommend just recoding `Outstate = log(Outstate)` right at the beginning.
 
 ### Part 1 (10 pts)
-### Part 1 (10 pts)
 
 Let's start by looking at a single predictor - the student/faculty ratio `S.F.Ratio`.  Plot log out of state tuition against the student/faculty ratio.  Does this look linear?
-```{r}
+
+Using a measure of expected prediction error appropriate for a standard linear model, find the order of global polynomial that minimizes EPE.  Be sure to note your choice and why you made it.  Using this value, train your model on the full training set and plot the prediction curve implied by the polynomial model on your graph.
+
+Next, estimate a cubic natural spline and a smoothing spline using the entire training data.  For the natural spline, you need to choose the number of knots or degrees of freedom.  I would recommend setting these to 5 to start and playing with it until you get something that looks right.  For the smoothing spline, you should choose the final form using a built-in cross-validation method (most likely GCV).  Add the prediction curve to your plot.  How do the drawn curves differ between methods?
+
+Finally, use your polynomial model and splines to create predictions for the test set and quantify the mean squared error for the test set.  Which model performs best?  Worst?  Provide some rationale for this outcome.
+
+```{r p4p1, warning=FALSE}
 #initial recoding: use c_train_q4 moving on for consistence
-c_train_q4<-c_train
-c_train_q4$Outstate<-log(c_train$Outstate)
-approachPlot<-qplot(x=S.F.Ratio,y=Outstate,data=c_train_q4,geom=c("point","smooth"),ylab="out of state tuition",xlab="student/faculty ratio")
+c_train_q4 <- c_train
+c_train_q4$Outstate <- log(c_train_q4$Outstate)
+
+approachPlot <- qplot(x=S.F.Ratio, y=Outstate, data=c_train_q4, geom=c("point","smooth"), 
+                      ylab="out of state tuition", xlab="student/faculty ratio")
 approachPlot
+
 # It looks quite linear, but could also be a second/third degree polynomial relationship. Compare the first smooth graph with the second one plotting in linear model, we can see that the relationship has a linear trend.
-lmApprochPlot<-qplot(x=S.F.Ratio,y=Outstate,data=c_train_q4,geom=c("point","smooth"),method="lm",ylab="out of state tuition",xlab="student/faculty ratio")
+lmApprochPlot <- qplot(x=S.F.Ratio, y=Outstate, data=c_train_q4, geom=c("point","smooth"), 
+                       method="lm", ylab="out of state tuition", xlab="student/faculty ratio")
 lmApprochPlot
 ```
 
-Using a measure of expected prediction error appropriate for a standard linear model, find the order of global polynomial that minimizes EPE.  Be sure to note your choice and why you made it.  Using this value, train your model on the full training set and plot the prediction curve implied by the polynomial model on your graph.
-```{r}
+```{r p4p1}
 # we reuse the function from problem set 2 for the wealth of non-simulation based estimates of the expected prediction error to make this decision
-lm_pred_metrics <- function(fit_model){
+lm_pred_metrics <- function(fit_model) {
+  
   #log-likelihood
   N <- length(fit_model$residuals)
   sig <- sigma(fit_model)
   res <- fit_model$residuals
   ll <- -N/2*log10(2*pi) - N/2*log10(sig^2) - 1/(2*sig^2)*sum(res^2)
+  
   #AIC
   d <- length(fit_model$coefficients) + 1
   AIC <- -2*ll + 2*(d)
+  
   #BIC
   BIC <- -2*ll + d*log10(N)
+  
   #LOOCV
   LOOCV <- (res[1] / (1-hatvalues(fit_model)[1]))^2
   if (N>=2){
@@ -431,8 +444,10 @@ lm_pred_metrics <- function(fit_model){
     }
   }
   LOOCV_final <- LOOCV / N
-  return(c("AIC" = AIC, "BIC" = BIC, "LOOCV" = LOOCV_final))
+  
+  return(c("AIC"=AIC, "BIC"=BIC, "LOOCV"=LOOCV_final))
 }
+
 p4p1_model_1 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,1))
 p4p1_model_2 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,2))
 p4p1_model_3 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,3))
@@ -443,85 +458,97 @@ p4p1_model_7 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,7))
 p4p1_model_8 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,8))
 p4p1_model_9 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,9))
 p4p1_model_10 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,10))
-p4p1_df <- data.frame(t(data.frame(lm_pred_metrics(p4p1_model_1), lm_pred_metrics(p4p1_model_2), lm_pred_metrics(p4p1_model_3), lm_pred_metrics(p4p1_model_4), lm_pred_metrics(p4p1_model_5), lm_pred_metrics(p4p1_model_6), lm_pred_metrics(p4p1_model_7), lm_pred_metrics(p4p1_model_8), lm_pred_metrics(p4p1_model_9), lm_pred_metrics(p4p1_model_10))))
+
+p4p1_df <- t(cbind(lm_pred_metrics(p4p1_model_1), lm_pred_metrics(p4p1_model_2), lm_pred_metrics(p4p1_model_3), lm_pred_metrics(p4p1_model_4), lm_pred_metrics(p4p1_model_5), lm_pred_metrics(p4p1_model_6), lm_pred_metrics(p4p1_model_7), lm_pred_metrics(p4p1_model_8), lm_pred_metrics(p4p1_model_9), lm_pred_metrics(p4p1_model_10)))
 num <- c(1:10)
 p4p1_df <- data.frame(num, p4p1_df)
-ggplot(p4p1_df, aes(x=num, y=LOOCV.1)) + geom_point() + xlab("degree polynomial")
+
+ggplot(data=p4p1_df) + 
+  geom_point(aes(x=num, y=LOOCV.1)) + 
+  geom_line(aes(x=num, y=LOOCV.1)) +
+  xlab("degree polynomial") + ylab('LOOCV') +
+  theme_bw()
 ```
 
-```{r}
+```{r p4p1}
 # We use LOOCV as our measure of EPE and find that third order of global polynomial that minimizes EPE. We choose LOOCV as there is less worry about bias and variance than other approaches and it's asymptotically unbiased for the  the EPE.From the graph above, we could see that the LOOCV reaches minimum for degree polynomial=3.
-optimalModel<-p4p1_model_3 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,3))
-predResult<-data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,predOutState=predict(optimalModel, newdata = c_train_q4))
-predResultPlot<-qplot(x=S.F.Ratio,y=predOutState,data=predResult,geom=c("point"),ylab="out of state tuition prediction",xlab="student/faculty ratio")
+optimalModel <- lm(c_train_q4$Outstate ~ poly(c_train_q4$S.F.Ratio,3))
+predResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,
+                         predOutState=optimalModel$fitted.values,
+                         originalOutState=c_train_q4$Outstate)
+
+predResultPlot <- ggplot(data=predResult) +
+  geom_point(aes(x=S.F.Ratio, y=predOutState, col='prediction')) +
+  geom_point(aes(x=S.F.Ratio, y=originalOutState, col='original')) +
+  scale_colour_manual(name="Legend", values=c('black','red')) +
+  ylab('OutState') + theme_bw()
 predResultPlot
 ```
 
-Next, estimate a cubic natural spline and a smoothing spline using the entire training data.  For the natural spline, you need to choose the number of knots or degrees of freedom.  I would recommend setting these to 5 to start and playing with it until you get something that looks right.  For the smoothing spline, you should choose the final form using a built-in cross-validation method (most likely GCV).  Add the prediction curve to your plot.  How do the drawn curves differ between methods?
-```{r}
-#natural spline(cubic)
-#via forLoop AIC check
-bestDf<-0
-AIC<-100000
-for(i in 5:20){
-  cubicSpline<-lm(Outstate~ns(S.F.Ratio,df=i),data=c_train_q4)
-  tempCheck<-lm_pred_metrics(cubicSpline)[1]
-  #print(tempCheck)
-  #print(i)
-  if(tempCheck<AIC){
-    bestDf<-i
-    AIC<-tempCheck
-    #print("yes")
-  }else{
-    #print("no")
-  }
-  #testGraph: recommend starts w 5
-  #cubicSplinePredResult<-data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,predOutState=predict(cubicSpline, newdata = c_train_q4))
-  #cubicSplinePredResultPlot<-qplot(x=S.F.Ratio,y=predOutState,data=cubicSplinePredResult,geom=c("point","smooth"),ylab="out of state tuition prediction",xlab="student/faculty ratio", main = toString(i))
-  #print(cubicSplinePredResultPlot)
+```{r p4p1}
+p4_1_num <- seq(1,20,1)
+p4_1_aic <- c()
+p4_1_bic <- c()
+p4_1_loocv <- c()
+
+for (i in 1:20) {
+  cubicSpline <- lm(Outstate ~ ns(S.F.Ratio,df=i), data=c_train_q4)
+  tempCheck <- unname(lm_pred_metrics(cubicSpline))
+  
+  p4_1_aic <- append(p4_1_aic, tempCheck[1])
+  p4_1_bic <- append(p4_1_bic, tempCheck[2])
+  p4_1_loocv <- append(p4_1_loocv, tempCheck[3])
 }
-print(bestDf)
+
+p4_1_dat <- data.frame(p4_1_num, p4_1_aic, p4_1_bic, p4_1_loocv)
 ```
 
+```{r p4p1}
+ggplot(data=p4_1_dat) +
+  geom_point(aes(x=p4_1_num, y=p4_1_aic)) +
+  geom_line(aes(x=p4_1_num, y=p4_1_aic)) +
+  xlab('df') + ylab('aic') +
+  theme_bw()
 
-```{r}
-#natural spline(cubic)
-#via forLoop graph check
-for(i in 1:20){
-  cubicSpline<-lm(Outstate~ns(S.F.Ratio,df=i),data=c_train_q4)
-  #testGraph: recommend starts w 5
-  cubicSplinePredResult<-data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,predOutState=predict(cubicSpline, newdata = c_train_q4),Outstate=c_train_q4$Outstate)
-  predResultPlot<-
-    ggplot(cubicSplinePredResult,aes(x=S.F.Ratio,y=predOutState),color='red')+
-    geom_point()+
-    geom_point(data=cubicSplinePredResult,aes(y=OutState),color='black')
-  print(predResultPlot)
-}
+ggplot(data=p4_1_dat) +
+  geom_point(aes(x=p4_1_num, y=p4_1_bic)) +
+  geom_line(aes(x=p4_1_num, y=p4_1_bic)) +
+  xlab('df') + ylab('bic') +
+  theme_bw()
+
+ggplot(data=p4_1_dat) +
+  geom_point(aes(x=p4_1_num, y=p4_1_loocv)) +
+  geom_line(aes(x=p4_1_num, y=p4_1_loocv)) +
+  xlab('df') + ylab('loocv') +
+  theme_bw()
 ```
 
+```{r p4p1}
+optimalCubicModel <- lm(Outstate ~ ns(S.F.Ratio,df=4), data=c_train_q4)
+predResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,
+                         predOutState=optimalCubicModel$fitted.values,
+                         originalOutState=c_train_q4$Outstate)
 
-```{r}
-#smoothing spline
-#compare and find the min GCV in range lambda=0:20
-bestLambda<-0
-smoothGcv<-10000
-tempNum<-seq(0,20,0.01)
-for(i in tempNum){
-  smoothSplineModel<-smooth.spline(c_train_q4$S.F.Ratio,c_train_q4$Outstate,lambda=i)
-  temp<-smoothSplineModel$cv.crit
-  print(temp)
-  if (smoothGcv>temp){
-    smoothGcv<-temp
-    bestLambda<-i
-  }
-}
-print(bestLambda)
-# optimal model we find with smoothing spline
-optSmoothSplineModel<-smooth.spline(c_train_q4$S.F.Ratio,c_train_q4$Outstate,lambda=bestLambda)
-smoothSplinePredResult<-data.frame()
+predResultPlot <- ggplot(data=predResult) +
+  geom_point(aes(x=S.F.Ratio, y=predOutState, col='prediction')) +
+  geom_point(aes(x=S.F.Ratio, y=originalOutState, col='original')) +
+  scale_colour_manual(name="Legend", values=c('black','red')) +
+  ylab('OutState') + theme_bw()
+predResultPlot
 ```
 
-Finally, use your polynomial model and splines to create predictions for the test set and quantify the mean squared error for the test set.  Which model performs best?  Worst?  Provide some rationale for this outcome.
+```{r p4p1}
+optimalSSModel <- smooth.spline(x=c_train_q4$S.F.Ratio, y=c_train_q4$Outstate)
+predResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,
+                         predOutState=predict(optimalSSModel, x=c_train_q4$S.F.Ratio),
+                         originalOutState=c_train_q4$Outstate)
+predResultPlot <- ggplot(data=predResult) +
+  geom_point(aes(x=S.F.Ratio, y=predOutState.y, col='prediction')) +
+  geom_point(aes(x=S.F.Ratio, y=originalOutState, col='original')) +
+  scale_colour_manual(name="Legend", values=c('black','red')) +
+  ylab('OutState') + theme_bw()
+predResultPlot
+```
 
 
 ### Part 2 (10 pts)
