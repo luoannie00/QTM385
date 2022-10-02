@@ -1,0 +1,639 @@
+
+---
+title: "Problem Set #3"
+author: "Kevin McAlister"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: no
+    toc_depth: '2'
+  prettydoc::html_pretty:
+    df_print: kable
+    theme: leonids
+    highlight: github
+    toc: no
+    toc_depth: 2
+    toc_float:
+      collapsed: no
+urlcolor: blue
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(glmnet)
+library(caret)
+library(Metrics)
+library(splines)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
+```
+
+```{r}
+setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps3')
+#setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/ps3')
+rm(list = ls())
+c_test <- read.csv('college_test.csv')
+c_train <- read.csv('college_train.csv')
+o_test <- read.csv('office_test.csv')
+o_train <- read.csv('office_train.csv')
+```
+
+This is the third problem set for QTM 385 - Intro to Statistical Learning.  This homework will cover applied exercises related to predictor selection for linear regression models. 
+
+Please use the intro to RMarkdown posted in the Intro module and my .Rmd file as a guide for writing up your answers.  You can use any language you want, but I think that a number of the computational problems are easier in R.  Please post any questions about the content of this problem set or RMarkdown questions to the corresponding discussion board.
+
+Your final deliverable should be two files: 1) a .Rmd/.ipynb file and 2) either a rendered HTML file or a PDF.  Students can complete this assignment in groups of up to 3.  Please identify your collaborators at the top of your document.  All students should turn in a copy of the solutions, but your solutions can be identical to those of your collaborators.
+
+This assignment is due by October 3rd, 2022 at 11:59 PM EST.  
+
+Collaborators: Billy Ge, Latifa Tan, Annie Luo
+
+***
+
+## Problem 1: An Important Ridge and LASSO Identity (15 pts)
+
+Both Ridge and LASSO present **regularized** solutions to the ill-posed variable selection problem for the linear model.  Recall that we can view each of these metthods as approaches to estimating coefficients that minimize different loss functions:
+
+$$\hat{\boldsymbol \beta}_{OLS} = \underset{\boldsymbol \beta}{\text{argmin  }} (\boldsymbol y - \mathbf X \boldsymbol \beta)'(\boldsymbol y - \mathbf X \boldsymbol \beta)$$
+
+$$\hat{\boldsymbol \beta}_{Ridge} = \underset{\boldsymbol \beta}{\text{argmin  }} (\boldsymbol y - \mathbf X \boldsymbol \beta)'(\boldsymbol y - \mathbf X \boldsymbol \beta) + \sum \limits_{j = 1}^P \beta_j^2$$
+
+$$\hat{\boldsymbol \beta}_{LASSO} = \underset{\boldsymbol \beta}{\text{argmin  }} (\boldsymbol y - \mathbf X \boldsymbol \beta)'(\boldsymbol y - \mathbf X \boldsymbol \beta) + \sum \limits_{j = 1}^P |\beta_j|$$
+
+There is a relationship between the optimal solutions for the regression coefficients under no penalty (the OLS solution), the ridge penalty, and the LASSO penalty.  The exact relationship cannot be derived for most cases, but we can gain some knowledge by assuming that the predictors are exactly orthogonal to one another.  Since we can always rescale the variance of the features, we can further restrict this to feature sets that have **orthonormal** columns - $\boldsymbol{X'X} = \mathcal{I}_P$.
+
+Assuming the feature matrix, $\boldsymbol{X}$, has orthnormal columns, show that:
+
+$$\hat{\beta}_{OLS} = \boldsymbol{X'y} \text{   ;   } \hat{\beta}_{Ridge} = \frac{\hat{\beta}_{OLS}}{1 + \lambda} \text{   ;   } \hat{\beta}_{LASSO} = \text{sign}(\hat{\beta}_{OLS}) \times \text{max}(|\hat{\beta}_{OLS}| - \lambda , 0)$$
+
+What do these equations show about **how** ridge and LASSO shrink coefficients towards zero?  Why can the LASSO set a coefficient to zero while ridge cannot?
+
+
+Notes:
+
+  1. $\sum \limits_{j = 1}^P \beta_j^2$ can also be expressed as $\beta'\beta$.
+  
+  2. Substitute $\hat{\beta}_{OLS} = \boldsymbol{X'y}$ whenever possible.
+  
+  3. It is probably easier to drop everything to elements of the coefficient vector for the LASSO at a certain point - e.g. work with $\beta_j$ instead of $\boldsymbol{\beta}$.  Since everything becomes a sum or sum of squares or sum of absolute values, you can separate the problem out easier this way.
+  
+  4. You can take it as a given that the sign of $\hat{\beta}_{OLS,j}$ is the same as $\hat{\beta}_{LASSO,j}$ (unless the LASSO solution is zero, but it won't matter there).
+  
+  5. These solutions can be found online and in various textbook resources.  I think this is a great exercise for thinking through complex minimization problems, so don't spoil yourself unless you really find yourself stuck.
+
+## Problem 1 solution:
+
+OLS:
+$$
+\begin{eqnarray}
+\frac{\partial \left[ \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right)' \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right) \right]}{\partial \boldsymbol{\beta}} &=& 0\\
+(-2) \boldsymbol{X}' \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right) &=& 0\\
+\boldsymbol{X}'\boldsymbol{y} - \boldsymbol{X}'\boldsymbol{X}\boldsymbol{\beta} &=& 0\\
+\boldsymbol{\hat{\beta}_{OLS}} &=& \left(\boldsymbol{X}'\boldsymbol{X} \right)^{-1}\boldsymbol{X}'\boldsymbol{y}\\
+\end{eqnarray}
+$$
+Since we are assuming orthonormal columns, we plug in $\boldsymbol{X'X} = \mathcal{I}_P$
+$$
+\begin{eqnarray}
+\boldsymbol{\hat{\beta}_{OLS}} &=& \left(\mathcal{I}_P \right)^{-1}\boldsymbol{X}'\boldsymbol{y}\\
+\boldsymbol{\hat{\beta}_{OLS}} &=& \boldsymbol{X}'\boldsymbol{y}
+\end{eqnarray}
+$$
+Ridge:
+$$
+\begin{eqnarray}
+\frac{\partial \left[ \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right)' \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right) + \lambda\sum \limits_{j = 1}^P \beta_j^2 \right]}{\partial \boldsymbol{\beta}} &=& 0\\
+(-2) \boldsymbol{X}' \left(\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}  \right) + 2\lambda\boldsymbol{\beta} &=& 0\\
+\lambda\boldsymbol{\beta} &=& \boldsymbol{X}'\boldsymbol{y} - \boldsymbol{X}'\boldsymbol{X}\boldsymbol{\beta}
+\end{eqnarray}
+$$
+Plug in $\boldsymbol{X'X} = \mathcal{I}_P$ and $\boldsymbol{\hat{\beta}_{OLS}} = \boldsymbol{X}'\boldsymbol{y}$, we get
+$$
+\begin{eqnarray}
+\lambda\boldsymbol{\beta} &=& \boldsymbol{\hat{\beta}_{OLS}} - \mathcal{I}_P\boldsymbol{\beta}\\
+\lambda\boldsymbol{\beta}+\boldsymbol{\beta} &=& \boldsymbol{\hat{\beta}_{OLS}}\\
+\boldsymbol{\hat{\beta}_{Ridge}} &=& \frac{\boldsymbol{\hat{\beta}_{OLS}}}{1+\lambda}
+\end{eqnarray}
+$$
+LASSO:
+For each $\beta_j$:
+$$
+\begin{eqnarray}
+\hat{\beta}_{j,LASSO} &=& \underset{\boldsymbol \beta_j}{\text{argmin  }} (y_j - \mathbf x_j \beta_j)^2 + \lambda * |\beta_j|\\
+\frac{\partial \left[ \hat{\beta}_{j,LASSO} \right]}{\partial {\beta_j}} &=& 2\left( -\boldsymbol x_j \right)'\left(y_j-\boldsymbol {x_j} \beta_j \right)+\lambda * \text{sign} \left(\beta_j \right) = 0\\
+\lambda * \text{sign} \left(\beta_j \right) &=& 2\boldsymbol{x_j}'y_j-2\boldsymbol {x_j}'\boldsymbol {x_j} \beta_j
+\end{eqnarray}
+$$
+Plug in $\boldsymbol{x_j'x_j} = \mathcal{I}_1$ and ${\hat{\beta}_{j,OLS}} = \boldsymbol{x_j}'{y_j}$, we get
+$$
+\begin{eqnarray}
+\lambda * \text{sign} \left(\beta_j \right) &=& 2\hat{\beta}_{j,OLS}-2\mathcal{I}_1 \beta_j\\
+\beta_j &=& \hat{\beta}_{j,OLS} - \frac{\lambda}{2}\text{sign} \left(\beta_j \right)
+\end{eqnarray}
+$$
+Set constant $\lambda$ to be $\frac{\lambda}{2}$, and summing up $\beta_j$, we get
+$$
+\begin{eqnarray}
+\hat {\boldsymbol \beta}_{LASSO} &=& \hat{\boldsymbol{\beta}}_{OLS} - \lambda*\text{sign} \left(\beta_j \right)
+\end{eqnarray}
+$$
+When $\hat{\boldsymbol{\beta}}_{OLS} > 0$, $\hat {\boldsymbol \beta}_{LASSO} = \hat{\boldsymbol{\beta}}_{OLS} - \lambda$; when $\hat{\boldsymbol{\beta}}_{OLS} < 0$, $\hat {\boldsymbol \beta}_{LASSO} = \hat{\boldsymbol{\beta}}_{OLS} + \lambda$.
+Therefore, we get
+$$
+\begin{eqnarray}
+\hat {\boldsymbol \beta}_{LASSO} &=& \text{sign} \left(\hat{\boldsymbol{\beta}}_{OLS} \right) * \left(|\hat{\boldsymbol{\beta}}_{OLS}| - \lambda \right)
+\end{eqnarray}
+$$
+
+
+## Problem 2: Applying Ridge and LASSO (35 pts)
+
+Ridge and LASSO are great methods for parsing through data sets with lots of predictors to find:
+
+  1. An interpretable set of important predictors - which predictors are **signal** and which ones are just **noise**
+  2. The set of parameters that minimize expected prediction error (with all the caveats that we discussed in the previous lectures)
+  
+Where these methods really shine for purpose 1 (and purpose 2, by construction) is when the ratio of predictors to observations approaches 1.  To see this and work through an example using pre-built software, let's try to build a model that predicts IMDB ratings for episodes of the Office (the U.S. Version).  `office_train.csv` includes IMDB ratings (`imdb_rating`) for 115 episodes of the office and a number of predictors for each episode:
+
+  1. The season of the episode (1 - 9, which should be treated as an unordered categorical variable)
+  2. The number of times main characters speak in the episode (`andy` through `jan`)
+  3. The director of the episode (`ken_kwapis` through `justin_spitzer`) already "dummied out" so that a 1 means the person directed the episode and a 0 means they did not
+  
+Let's use this data to build a predictive model for IMDB ratings and check our predictive accuracy on the heldout test set (`office_test.csv`).
+
+For this problem, you can restrict your search to the set of standard linear models (e.g. no interactions, no basis expansions, etc.).  If you would like to try to include more terms to improve the model, you are more than welcome to try!
+
+**An important step: Get rid of any features that are observation specific!** 
+
+### Part 1 (10 pts)
+
+Start by limiting yourself to the standard OLS model.   
+
+Find the regression coefficients that minimize the training error under squared error loss and use this model to compute the LOOCV estimate of the expected prediction error using all features.
+
+Create a plot that demonstrates the regression coefficients granted by OLS.  Which predictors are important?  Which ones are not?  I recommend using a sideways bar plot - you can see an example construction [here](https://dk81.github.io/dkmathstats_site/rvisual-sideways-bargraph.html).
+
+Select a subset of "important" predictors and find the set of coefficients that minimizes MSE under squared error loss.  Compute the LOOCV estimate of the expected prediction error for your smaller model.  How does this LOOCV estimate compare to the LOOCV for the full model?
+
+Note: You don't need to try to perform any methods of subset selection in this step.  Just use heuristic methods to determine which coefficients appear to be important for the model!
+
+### Part 1 solution:
+```{r p2p1}
+#delete variable episode_name
+o_train <- o_train %>% select(-episode_name)
+
+#split variable season into 9 variables
+dummy_o_train <- caret::dummyVars("~.", data=o_train)
+o_train <- data.frame(predict(dummy_o_train, newdata=o_train))
+
+#full model
+p2p1_m <- lm(imdb_rating ~ ., data=o_train)
+
+#LOOCV
+lm_pred_metrics <- function(fit_model) {
+  LOOCV <- mean((fit_model$residuals / (1-hatvalues(fit_model)))^2)
+  return (LOOCV)
+}
+lm_pred_metrics(p2p1_m) #LOOCV is 0.2343854
+
+#plot
+cf <- coef(summary(p2p1_m, complete=TRUE))
+cf <- data.frame(rownames(cf), cf)
+
+ggplot(data=cf, aes(x=rownames.cf., y=Estimate)) +
+  geom_bar(stat="identity", width=0.75) + coord_flip() +
+  labs(x="Features", y="Coefficient Estimate") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.title.x = element_text(face="bold", colour="red", size = 12),
+        axis.title.y = element_text(face="bold", colour="red", size = 12)) 
+```
+From the plot, we see that predictors season3, season1, paul_lieberstein, mindy_kaling, justin_spitzer, greg_daniels, and b_j_novak seem important, while the rest don't.
+
+```{r p2p1}
+#subset of important predictors
+p2p1_imp_pred <- o_train %>% select(seasonSeason.3, seasonSeason.1, paul_lieberstein, mindy_kaling, justin_spitzer, greg_daniels, b_j_novak, imdb_rating)
+
+#important predictors model
+p2p1_imp_pred_m <- lm(imdb_rating ~ ., data=p2p1_imp_pred)
+
+#LOOCV
+lm_pred_metrics(p2p1_imp_pred_m) #LOOCV is 0.2543553
+```
+The LOOCV of the important predictors model is slightly larger than the full model.
+
+### Part 2 (10 pts)
+
+Now, consider ridge regression.  Using a pre-built implementation of ridge regression, train the model using a large number of possible values for $\lambda$.  
+
+Using $10$-fold cross validation, find a reasonable value of $\lambda$ that should minimize the expected prediction error.  You can choose the actual minimum or a slightly less complex model.  Defend this choice.
+
+Create a plot that demonstrates the regression coefficients for the ridge regression with your optimal choice of $\lambda$.  Which predictors are important?  Which ones are not?  I recommend using a sideways bar plot - you can see an example construction [here](https://dk81.github.io/dkmathstats_site/rvisual-sideways-bargraph.html).
+
+### Part 2 solution:
+```{r p2p2}
+p2p2_pred <- as.matrix(o_train[,-38])
+p2p2_out <- as.matrix(o_train$imdb_rating)
+
+#100 possible values of lambda
+p2p2_ridgem <- glmnet::glmnet(x=p2p2_pred, y=p2p2_out, family="gaussian", alpha=0, nlambda=100)
+print(p2p2_ridgem)
+
+p2p2_cv_ridgem <- cv.glmnet(x=p2p2_pred, y=p2p2_out, family="gaussian", alpha=0, nfolds=10, type.measure="mse")
+plot(p2p2_cv_ridgem)
+print(p2p2_cv_ridgem)
+
+p2p2_optimal_ridgem <- glmnet::glmnet(x=p2p2_pred, y=p2p2_out, family="gaussian", alpha=0, lambda=0.74)
+#plot
+cf1 <- c()
+cf2 <- c()
+for (i in 1:37) {
+  cf1 <- append(cf1, rownames(p2p2_optimal_ridgem$beta)[i])
+  cf2 <- append(cf2, unname(p2p2_optimal_ridgem$beta)[i])
+}
+cf <- data.frame(cf1, cf2)
+
+ggplot(data=cf, aes(x=cf1, y=cf2)) +
+  geom_bar(stat="identity", width=0.75) + coord_flip() +
+  labs(x="Features", y="Coefficient Estimate") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.title.x = element_text(face="bold", colour="red", size = 12),
+        axis.title.y = element_text(face="bold", colour="red", size = 12))
+```
+The value of lambda that minimizes the expected prediction error is 0.74 according to the 10 fold cross validation. I stick with the suggested lambda value for the model, because based on the plot, expected prediction error picks up pretty obviously as lambda increases.
+
+Based on the plot, the important predictors are season9, season8, season7, season6, season5,
+season4, season3, season1, randall_einhorn, paul_lieberstein, paul_feig, greg_daniels, and gene_stupnitsky, whereas the rest of the predictors are not.
+
+### Part 3 (10 pts)
+
+Finally, consider linear regression with the LASSO penalty.  Using a pre-built implementation, train the model using a large number of possible values for $\lambda$. 
+
+Using $10$-fold cross validation, find a reasonable value of $\lambda$ that should minimize the expected prediction error.  You can choose the actual minimum or a slightly less complex model (smaller $\lambda$ is less complex).  Defend this choice.
+
+Create a plot that demonstrates the regression coefficients for the LASSO regression with your optimal choice of $\lambda$.  Which predictors are important?  Which ones are not?
+
+```{r p2p3}
+p2p3_pred <- as.matrix(o_train[,-38])
+p2p3_out <- as.matrix(o_train$imdb_rating)
+
+#100 possible values of lambda
+p2p3_lassom <- glmnet::glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, nlambda=100)
+print(p2p3_lassom)
+
+p2p3_cv_lassom <- cv.glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, nfolds=10, type.measure="mse")
+plot(p2p3_cv_lassom)
+print(p2p3_cv_lassom)
+
+p2p3_optimal_lassom <- glmnet::glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, lambda=0.03343)
+#plot
+cf1 <- c()
+cf2 <- c()
+for (i in 1:37) {
+  cf1 <- append(cf1, rownames(p2p3_optimal_lassom$beta)[i])
+  cf2 <- append(cf2, unname(p2p3_optimal_lassom$beta)[i])
+}
+cf <- data.frame(cf1, cf2)
+
+ggplot(data=cf, aes(x=cf1, y=cf2)) +
+  geom_bar(stat="identity", width=0.75) + coord_flip() +
+  labs(x="Features", y="Coefficient Estimate") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.title.x = element_text(face="bold", colour="red", size = 12),
+        axis.title.y = element_text(face="bold", colour="red", size = 12))
+```
+The value of lambda that minimizes the expected prediction error is 0.03343 according to the 10 fold cross validation. I stick with the suggested lambda value for the model, because based on the plot, expected prediction error picks up pretty obviously as lambda increases.
+
+Based on the plot, the important predictors are season8, season6, season3, season1, paul_feig, and greg_daniels, whereas the rest of the predictors are not.
+
+### Part 4 (5 pts)
+
+Which of OLS with all predictors, OLS with your chosen subset of predictors, Ridge, or LASSO has the smallest cross validation estimate of expected prediction error?  Do you have any intuition as to why this result occurs?
+
+Using the optimal models from each step, compute an estimate of the expected prediction error using the heldout test data.  Does the same relationship hold?
+
+Compare your plots for the regression coefficients for the full OLS model, the ridge regression, and LASSO regression.  How do LASSO and Ridge improve the expected prediction error for this problem?
+
+```{r p2p4}
+data.frame(
+  epe_full_lm = lm_pred_metrics(p2p1_m),
+  epe_subset_lm = lm_pred_metrics(p2p1_imp_pred_m),
+  epe_optimal_ridge = min(p2p2_cv_ridgem$cvm),
+  epe_optimal_lasso = min(p2p3_cv_lassom$cvm))
+```
+According to the above comparison, the optimal ridge and lasso models have similar performance on expected prediction errors that are both lower than the OLS models.
+
+```{r p2p4}
+#delete variable episode_name
+o_test <- o_test %>% select(-episode_name)
+
+#split variable season into 9 variables
+dummy_o_test <- caret::dummyVars("~.", data=o_test)
+o_test <- data.frame(predict(dummy_o_test, newdata=o_test))
+
+p2p4_pred_mat <- as.matrix(o_test[,-38])
+p2p4_pred_df_full <- o_test[,-38]
+p2p4_pred_df_imp <- o_test %>% select(seasonSeason.3, seasonSeason.1, paul_lieberstein, mindy_kaling, justin_spitzer, greg_daniels, b_j_novak, imdb_rating)
+
+#predictions
+o_test$full_lm <- predict(p2p1_m, newdata=p2p4_pred_df_full)
+o_test$subset_lm <- predict(p2p1_imp_pred_m, newdata=p2p4_pred_df_imp)
+o_test$optimal_ridge <- predict(p2p2_optimal_ridgem, newx=p2p4_pred_mat)
+o_test$optimal_lasso <- predict(p2p3_optimal_lassom, newx=p2p4_pred_mat)
+
+#mse comparison
+data.frame(
+  mse_full_lm = mse(o_test$imdb_rating, o_test$full_lm),
+  mse_subset_lm = mse(o_test$imdb_rating, o_test$subset_lm),
+  mse_optimal_ridge = mse(o_test$imdb_rating, o_test$optimal_ridge),
+  mse_optimal_lasso = mse(o_test$imdb_rating, o_test$optimal_lasso))
+```
+Yes, the same result holds in the heldout test data, where the optimal ridge and lasso models perform better than full and subset OLS models.
+
+## Problem 3: A Nifty Identity for Cubic Regression Splines (15 pts)
+
+Regression splines are a broadly applicable method for regression analysis because they can be represented and estimated as an augmented OLS problem.
+
+A generic cubic regression spline with $K$ knots can be represented as a linear model with $K + 4$ basis expansion terms:
+
+$$h_1(x) = 1 \text{   ;   } h_{\text{2 to 4}}(x) = \{x,x^2,x^3\}$$
+
+$$h_{\text{5 to K + 4}} = \{(x - \xi_1)_+^3 ,  (x - \xi_2)_+^3,...,(x - \xi_K)_+^3\}$$
+
+$$y_i = \alpha + \sum \limits_{k = 2}^{K + 4} \beta_k h_k(x_i) + \epsilon_i$$
+Cubic regression splines fit a function to the data that is continuous with respect to $x$ and continuous in its first two derivatives.
+
+For an arbitrary collection of $K \le N$ knots, show that the cubic regression spline provides a function that is continuous in the first and second derivative at the knots.
+
+Notes:
+
+  1. You can assume that the function is continuous and twice differentiable away from the knots.  This is true and provable, but you can just take that for granted without further explanation.
+  
+  2. With an appropriate argument about the relationship between continuity in the 1st and 2nd derivatives, you don't need to show continuity on the first derivatives.
+  
+  3. Remember that we can show continuity by proving that the left and right limits of a function are equivalent!
+
+## Problem 3 solution:
+$$
+\begin{eqnarray}
+y_i &=& \alpha + \beta_2 h_2(x_i) + \beta_3 h_3(x_i) + \beta_4 h_4(x_i) + \sum \limits_{k = 5}^{K} \beta_k h_k(x_i) + \epsilon_i\\
+y_i &=& \alpha + \beta_2x_i + \beta_3 x_i^2 + \beta_4 x_i^3 +  \sum \limits_{k = 1}^{K} \beta_{k+4} (x_i - \xi_k)^3 + \epsilon_i\\
+\frac{dy_i}{dx_i} &=& \beta_2 + 2\beta_3x_i + 3\beta_4 x_i^2 + 3\sum \limits_{k = 1}^{K} \beta_{k+4} (x_i - \xi_k)^2\\
+\frac{d^2y_i}{dx_i^2} &=& 2\beta_3 + 6\beta_4 x_i + 6\sum \limits_{k = 1}^{K} \beta_{k+4} (x_i - \xi_k)\\
+\frac{d^3y_i}{dx_i^3} &=& 6\beta_4 + 6\sum \limits_{k = 1}^{K} \beta_{k+4}\\
+\end{eqnarray}
+$$
+Since the function is three-times differentiable, the second derivative of the function is continuous. Since the function has a second derivative, it's twice differentiable, which proves that the function's first derivative is continuous. Since the function is continuous in the first and second derivative for all $x_i$, the function is continuous in the first and second derivative at the knots.
+
+## Problem 4: Nonlinear Regression Methods (35 pts)
+
+The data sets `college_train.csv` (600 observations) and `college_test.csv` (177 observations) include information about different colleges in the U.S.  We're going to use this data set to try to build a model that predicts the logarithm of out of state tuition for a college using a variety of predictors related to college quality.  Note that this data was collected back in 1995 - a magical time in U.S. history where "Run Around" by Blues Traveler was playing on the radio, Bill Clinton had a plan to actually balance the U.S. budget, and young Dr. McAlister learned to tie his shoes in Ms. Lamb's first grade class.  It is also notable that college used to be affordable!  Don't be too downtrodden when you look at this data set and see Emory's out of state tuition back then...
+
+As always, the test set is intended to be used only for quantifying expected prediction error after choosing some trained models.  A description of the variables in the data set can be found [here](https://www.rdocumentation.org/packages/ISLR/versions/1.4/topics/College).  I've added an additional predictor called `AcceptRate` which is the acceptance rate of the school in 1995.
+
+Note: I would recommend just recoding `Outstate = log(Outstate)` right at the beginning.
+
+### Part 1 (10 pts)
+
+Let's start by looking at a single predictor - the student/faculty ratio `S.F.Ratio`.  Plot log out of state tuition against the student/faculty ratio.  Does this look linear?
+
+Using a measure of expected prediction error appropriate for a standard linear model, find the order of global polynomial that minimizes EPE.  Be sure to note your choice and why you made it.  Using this value, train your model on the full training set and plot the prediction curve implied by the polynomial model on your graph.
+
+Next, estimate a cubic natural spline and a smoothing spline using the entire training data.  For the natural spline, you need to choose the number of knots or degrees of freedom.  I would recommend setting these to 5 to start and playing with it until you get something that looks right.  For the smoothing spline, you should choose the final form using a built-in cross-validation method (most likely GCV).  Add the prediction curve to your plot.  How do the drawn curves differ between methods?
+
+Finally, use your polynomial model and splines to create predictions for the test set and quantify the mean squared error for the test set.  Which model performs best?  Worst?  Provide some rationale for this outcome.
+
+```{r p4p1, warning=FALSE}
+#initial recoding: use c_train_q4 moving on for consistence
+c_train_q4 <- c_train
+c_train_q4$Outstate <- log(c_train_q4$Outstate)
+
+approachPlot <- qplot(x=S.F.Ratio, y=Outstate, data=c_train_q4, geom=c("point","smooth"), 
+                      ylab="out of state tuition", xlab="student/faculty ratio")
+approachPlot
+
+# It looks quite linear, but could also be a second/third degree polynomial relationship. Compare the first smooth graph with the second one plotting in linear model, we can see that the relationship has a linear trend.
+lmApprochPlot <- qplot(x=S.F.Ratio, y=Outstate, data=c_train_q4, geom=c("point","smooth"), 
+                       method="lm", ylab="out of state tuition", xlab="student/faculty ratio")
+lmApprochPlot
+```
+
+```{r p4p1}
+# we reuse the function from problem set 2 for the wealth of non-simulation based estimates of the expected prediction error to make this decision
+lm_pred_metrics <- function(fit_model) {
+  
+  #log-likelihood
+  N <- length(fit_model$residuals)
+  sig <- sigma(fit_model)
+  res <- fit_model$residuals
+  ll <- -N/2*log10(2*pi) - N/2*log10(sig^2) - 1/(2*sig^2)*sum(res^2)
+  
+  #AIC
+  d <- length(fit_model$coefficients) + 1
+  AIC <- -2*ll + 2*(d)
+  
+  #BIC
+  BIC <- -2*ll + d*log10(N)
+  
+  #LOOCV
+  LOOCV <- (res[1] / (1-hatvalues(fit_model)[1]))^2
+  if (N>=2){
+    for (i in 2:N){
+      LOOCV <- LOOCV + (res[i] / (1-hatvalues(fit_model)[i]))^2
+    }
+  }
+  LOOCV_final <- LOOCV / N
+  
+  return(c("AIC"=AIC, "BIC"=BIC, "LOOCV"=LOOCV_final))
+}
+
+p4p1_model_1 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,1))
+p4p1_model_2 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,2))
+p4p1_model_3 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,3))
+p4p1_model_4 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,4))
+p4p1_model_5 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,5))
+p4p1_model_6 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,6))
+p4p1_model_7 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,7))
+p4p1_model_8 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,8))
+p4p1_model_9 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,9))
+p4p1_model_10 <- lm(c_train_q4$Outstate~poly(c_train_q4$S.F.Ratio,10))
+
+p4p1_df <- t(cbind(lm_pred_metrics(p4p1_model_1), lm_pred_metrics(p4p1_model_2), lm_pred_metrics(p4p1_model_3), lm_pred_metrics(p4p1_model_4), lm_pred_metrics(p4p1_model_5), lm_pred_metrics(p4p1_model_6), lm_pred_metrics(p4p1_model_7), lm_pred_metrics(p4p1_model_8), lm_pred_metrics(p4p1_model_9), lm_pred_metrics(p4p1_model_10)))
+num <- c(1:10)
+p4p1_df <- data.frame(num, p4p1_df)
+
+ggplot(data=p4p1_df) + 
+  geom_point(aes(x=num, y=LOOCV.1)) + 
+  geom_line(aes(x=num, y=LOOCV.1)) +
+  xlab("degree polynomial") + ylab('LOOCV') +
+  theme_bw()
+```
+
+```{r p4p1}
+# We use LOOCV as our measure of EPE and find that third order of global polynomial that minimizes EPE. We choose LOOCV as there is less worry about bias and variance than other approaches and it's asymptotically unbiased for the  the EPE.From the graph above, we could see that the LOOCV reaches minimum for degree polynomial=3.
+optimalModel <- lm(c_train_q4$Outstate ~ poly(c_train_q4$S.F.Ratio,3))
+predResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,
+                         predOutState=optimalModel$fitted.values,
+                         originalOutState=c_train_q4$Outstate)
+
+predResultPlot <- ggplot(data=predResult) +
+  geom_point(aes(x=S.F.Ratio, y=predOutState, col='prediction')) +
+  geom_point(aes(x=S.F.Ratio, y=originalOutState, col='original')) +
+  scale_colour_manual(name="Legend", values=c('black','red')) +
+  ylab('OutState') + theme_bw()
+predResultPlot
+```
+
+```{r p4p1}
+p4_1_num <- seq(1,20,1)
+p4_1_aic <- c()
+p4_1_bic <- c()
+p4_1_loocv <- c()
+
+for (i in 1:20) {
+  cubicSpline <- lm(Outstate ~ ns(S.F.Ratio,df=i), data=c_train_q4)
+  tempCheck <- unname(lm_pred_metrics(cubicSpline))
+  
+  p4_1_aic <- append(p4_1_aic, tempCheck[1])
+  p4_1_bic <- append(p4_1_bic, tempCheck[2])
+  p4_1_loocv <- append(p4_1_loocv, tempCheck[3])
+}
+
+p4_1_dat <- data.frame(p4_1_num, p4_1_aic, p4_1_bic, p4_1_loocv)
+```
+
+```{r p4p1}
+ggplot(data=p4_1_dat) +
+  geom_point(aes(x=p4_1_num, y=p4_1_aic)) +
+  geom_line(aes(x=p4_1_num, y=p4_1_aic)) +
+  xlab('df') + ylab('aic') +
+  theme_bw()
+
+ggplot(data=p4_1_dat) +
+  geom_point(aes(x=p4_1_num, y=p4_1_bic)) +
+  geom_line(aes(x=p4_1_num, y=p4_1_bic)) +
+  xlab('df') + ylab('bic') +
+  theme_bw()
+
+ggplot(data=p4_1_dat) +
+  geom_point(aes(x=p4_1_num, y=p4_1_loocv)) +
+  geom_line(aes(x=p4_1_num, y=p4_1_loocv)) +
+  xlab('df') + ylab('loocv') +
+  theme_bw()
+```
+
+```{r p4p1}
+optimalCubicModel <- lm(Outstate ~ ns(S.F.Ratio,df=4), data=c_train_q4)
+predResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,
+                         predOutState=optimalCubicModel$fitted.values,
+                         originalOutState=c_train_q4$Outstate)
+
+predResultPlot <- ggplot(data=predResult) +
+  geom_point(aes(x=S.F.Ratio, y=predOutState, col='prediction')) +
+  geom_point(aes(x=S.F.Ratio, y=originalOutState, col='original')) +
+  scale_colour_manual(name="Legend", values=c('black','red')) +
+  ylab('OutState') + theme_bw()
+predResultPlot
+```
+
+```{r p4p1}
+optimalSSModel <- smooth.spline(x=c_train_q4$S.F.Ratio, y=c_train_q4$Outstate)
+predResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,
+                         predOutState=predict(optimalSSModel, x=c_train_q4$S.F.Ratio),
+                         originalOutState=c_train_q4$Outstate)
+predResultPlot <- ggplot(data=predResult) +
+  geom_point(aes(x=S.F.Ratio, y=predOutState.y, col='prediction')) +
+  geom_point(aes(x=S.F.Ratio, y=originalOutState, col='original')) +
+  scale_colour_manual(name="Legend", values=c('black','red')) +
+  ylab('OutState') + theme_bw()
+predResultPlot
+```
+
+
+### Part 2 (10 pts)
+
+Now, let's consider the multivariate case with all of the predictors.  Let's improve on the standard linear model by using LASSO to do some variable selection and shrinkage.  Fit the LASSO model to the training data and use K-fold cross validation to select a value of $\lambda$.  Be sure to explain why you made the choice that you did.  How many variables are used in the "optimal" model?  Be sure to record the optimal $\lambda$ for later use.
+
+### Part 3 (10 pts)
+
+Now, let's see if we can improve on the standard LASSO regression model using a GAM.  There are three approaches you can take here:
+
+  1. Use all of the predictors.
+  2. Only use the predictors selected by LASSO under your optimal model.
+  3. Try to fit the GAM with an even smaller model using a subset of predictors from a higher sparsity point on the LASSO path.
+  
+Since we can only estimate a GAM with terms and interactions that we know to put in, it can be really difficult to find the optimal model.  This means that Option 2 or 3 is probably your best bet for this particular problem.  The benefit of taking this subset approach is that we can really try to model meaningful non-linearities and **interactions** between features.
+  
+Use the LASSO regularization path for your LASSO model estimated in part 2 to pick the model with **at most** 6 predictors that minimizes expected prediction error.  To select the included coefficients, I highly recommend that you leverage the plots produced by `glmnet` to find the corresponding $\lambda$.  Then, using the chosen value of $\lambda$, find the set of non-zero coefficients.  Regardless of your choice, your model should include `S.F.Ratio` (though I'm pretty sure that this variable will pop up pretty early along the LASSO regularization path!).
+
+Using the selected variables, estimate a GAM model that best predicts log out of state tuition.  Try different combinations of linear terms, spline terms, and thin-plate/tensor spline terms to try to minimize the GCV associated with your GAM.  Most implementations will return this as part of the model object.
+
+*Note*: There is no exhaustive way to find the actual GCV minimizer using GAMs.  You'll just need to use intuition to determine what variables have significant **interactions** that should be included in the model building step.
+
+Create a plot that shows the function for each predictor.  Do the marginal relationships make sense?  For any 2-predictor spline terms, do they capture anything that wouldn't be captured by a linear model?  
+
+Look at your function for `S.F.Ratio`.  Does it look like the smoothing spline you uncovered in part 1?  What does this say about the plausibility of the additivity assumption for this specific variable?
+
+Be sure to note your "optimal" model and why you chose that one.  Your search doesn't need to be exhaustive (that's impossible), just a reasonable attempt to get a good predictive model!
+
+*Note*: You can think of the curve produced by the GAM for a given predictor as an additive value.  For example, if we see that the curve for S.F.Ratio is at -.1 when S.F.Ratio is equal to 5, then we can say that observing an S.F.Ratio = 5 means that we are subtracting .1 from our overall prediction. 
+
+### Part 4 (5 pts)
+
+Finally, let's compare both models to see which one performs best on the out of sample data.  Create predictions using your LASSO model and GAM for the out of sample test data.  Use these predictions to compute the out of sample MSE for each method.  Which performs best?
+
+In a few sentences, discuss the practical limitations of the LASSO and GAM approach used in part 3.  When will this kind of process not be viable?
+
+
+
+
+***
+
+## Discussion on Computational Resources
+
+### `glmnet`
+
+I'm going to provide some guidance on implementing Ridge and LASSO in R and Python.  For these problems, I highly recommend using the package `glmnet` in both R and Python.  The vignette for R can be found [here](https://cran.r-project.org/web/packages/glmnet/vignettes/glmnet.pdf) and the vignette for the Python package can be found [here](https://glmnet-python.readthedocs.io/en/latest/glmnet_vignette.html#Usage).  This package was developed by the authors of ESL and ISLR as a general purpose implementation of the Elastic Net for estimating regression coefficients.  The packages is C++ and Fortran optimized, meaning that it absolutely beats the pants off of other implementations in terms of computational speed.  It also has built in functions and favorable construction for plotting regularization paths and choosing $\lambda$ via cross validation.  There are a million and one more implementations, but I think that this one is the best for our purposes.
+
+A first note is that the main function `glmnet` does not take formula inputs - e.g. `y ~ x1 + x2`.  Rather, it requires that you pass it a vector or matrix of outcome values, `y`, and a $N \times P$ matrix of predictors, `x`.  This is a design choice that is implemented to prevent people from using `glmnet` to mine their way to "victory" in finding the best predictive model.  One thing that we've seen is that we may want to consider basis expansions (`poly()` in R) or multiplicative interactions between predictors (`x1*x2` in R).  The formula language makes this implementation easy - maybe too easy.  Since Ridge and LASSO are essentially indiscriminately setting some number of predictors to zero, this would lead to nonsense models that have interaction terms without their constituent marginal components and broken basis expansions.  Rather than implement smart grouping features, the authors of the package discourage this by making you construct the predictor set rather than creating "user-friendly" niceties - when you see how big $P$ is for the full model, you'll often rethink whether or not you truly believe it's necessary!
+
+`glmnet` models the intercept separately.  This is because it makes little sense to penalize the estimate of the intercept.  So, you do not need to include a column of 1s in your predictor matrix.
+
+There is one case where this construction leads to some pain - dummying out or one-hot encoding unordered categorical predictors.  For example, the season in the Office problem above should be treated as an unordered categorical predictor.  Typically, we can set `season` to be a factor and the formula language in R will deal with it for you.  However, `glmnet` requires us to do it ourselves. 
+
+To process the training and test data to "one-hot encode" the season of the episode, we need to convert the unordered categorical variable with $M$ categories to $M$ separate predictors that take a value of 1 if they are in that group and 0 otherwise.  For example, a variable called `Season 9` would take a value of 1 if the episode was in season 9 and 0 otherwise.  If the unordered categorical variable is a factor in a data frame, then there is an easy way to do it in R using the `caret` package and the function `dummyVars`:
+```{r, include=TRUE, eval = FALSE}
+train$season <- factor(train$season)
+dummy_train <- caret::dummyVars(" ~ .", data = train)
+train <- data.frame(predict(dummy_train, newdata = train))
+```
+which takes a data frame with factor columns and returns another data frame with all factor columns dummied out and the rest of the columns intact.  In Python, `OneHotEncoder` in `sklearn` will achieve the same thing.  There are also ways to do this manually, so do what is easiest for you.
+
+Another point is that `glmnet` standardizes all of the predictors.  Using a single $\lambda$ shrinkage parameter works best when all predictors are on the same scale.  This leads to standardized regression coefficients that are interpreted similarly - a 1 standard deviation change in X results in a $\beta$ unit change in Y.  This standardization can be done by the user, but it is not recommended since `glmnet` implements the standardization in a specific way.  This can lead to some weirdness when trying to predict new values of the outcome using a specific $\lambda$ value, so it is recommended that you use the built-in `predict` function to do this.
+
+`glmnet` has a lot of arguments.  But, we only really need to look at a few of them:
+
+  1. `x` and `y` - the input predictors and outcomes
+  
+  2. `family` - for now, we only need `family = "gaussian"`.  `glmnet` can do ridge or LASSO penalized generalized linear models - most importantly logistic regression.  Since we're only working with linear regression, we are assuming Gaussian distributed errors.
+  
+  3. `alpha` - the value for the exponent of the Elastic Net penalty.  `alpha = 0` corresponds to ridge regression while `alpha = 1` corresponds to LASSO regression.
+  
+  4. `nlambda` - the number of $\lambda$ values to consider when fitting the regularization path.  `glmnet` is smart and figures out good values for the minimum and maximum $\lambda$ to be considered.  This controls how granular the path of $\lambda$ checked is.  The default of 100 is usually more than enough.
+  
+  5. `lambda` - there's no need to do this!  Just fit the full path of $\lambda$ values and extract via `predict` or `coefs`.
+  
+Everything else is only needed for very specific circumstances.  If you need to change one of these from the defaults, you'll know.
+
+Two other functions of importance: 1) `predict` and 2) `cv.glmnet`.  
+
+`predict` for a `glmnet` object will take in new values of x and return the value of $\hat{y}$.  `newx` should be a $M \times P$ matrix of $M$ new observations.  `s` is the value of $\lambda$ at which predictions are to be made.  `type` is not relevant for linear regression, but can be used to change what level of $\hat{y}$ is computed (more to come in a few weeks).
+
+`cv.glmnet` will create random partitions within the provided training data to do $K$-fold cross validation.  This approach is 100% superior to any implementation you will write yourself, so just use this for computing cross-validation estimates of the expected prediction error.  The arguments for `cv.glmnet` include all of the arguments for `glmnet` with two additional important inputs:
+
+  1. `nfolds` - the number of disjoint folds to create within the training data.  Default is 10 and is usually a good choice.
+  
+  2. `type.measure` - the loss function to consider when computing the estimate of the expected prediction error.  The default is to compute deviance, $-2 \ell \ell$, for the regression model.  Note that this is equivalent to MSE for the Gaussian model.  Two other common choices - `mse` and `mae`.  The choice here should be informed by what loss you're trying to minimize.  MSE works well for our purposes, but may not make sense in other contexts.
+  
+With `cv.glmnet`, you can plot the $K$-fold curve for all attempted values of $\lambda$ and search for a meaningful minimum.  It will also return the minimum loss $\lambda$ and the one standard error value of $\lambda$.  Your choice here should be informed by the problem, but is unlikely to make a significant difference in your conclusions.
