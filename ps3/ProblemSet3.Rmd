@@ -464,7 +464,7 @@ Next, estimate a cubic natural spline and a smoothing spline using the entire tr
 bestDf<-0
 AIC<-100000
 for(i in 5:20){
-  cubicSpline<-lm(Outstate~ns(S.F.Ratio,df=i),data=c_train_q4)
+  cubicSpline<-lm(Outstate~ns(S.F.Ratio,df=i,degree=2),data=c_train_q4)
   tempCheck<-lm_pred_metrics(cubicSpline)[1]
   #print(tempCheck)
   #print(i)
@@ -488,7 +488,7 @@ print(bestDf)
 #natural spline(cubic)
 #via forLoop graph check
 for(i in 1:20){
-  cubicSpline<-lm(Outstate~ns(S.F.Ratio,df=i),data=c_train_q4)
+  cubicSpline<-lm(Outstate~ns(S.F.Ratio,df=i,degree=2),data=c_train_q4)
   #testGraph: recommend starts w 5
   cubicSplinePredResult<-data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,predOutState=predict(cubicSpline, newdata = c_train_q4),Outstate=c_train_q4$Outstate)
   predResultPlot<-
