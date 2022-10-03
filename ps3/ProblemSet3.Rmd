@@ -212,6 +212,7 @@ ggplot(data=cf, aes(x=rownames.cf., y=Estimate)) +
         axis.title.x = element_text(face="bold", colour="red", size = 12),
         axis.title.y = element_text(face="bold", colour="red", size = 12)) 
 ```
+
 From the plot, we see that predictors season3, season1, paul_lieberstein, mindy_kaling, justin_spitzer, greg_daniels, and b_j_novak seem important, while the rest don't.
 
 ```{r}
@@ -224,6 +225,7 @@ p2p1_imp_pred_m <- lm(imdb_rating ~ ., data=p2p1_imp_pred)
 #LOOCV
 lm_pred_metrics(p2p1_imp_pred_m) #LOOCV is 0.2543553
 ```
+
 The LOOCV of the important predictors model is slightly larger than the full model.
 
 ### Part 2 (10 pts)
@@ -247,7 +249,7 @@ p2p2_cv_ridgem <- cv.glmnet(x=p2p2_pred, y=p2p2_out, family="gaussian", alpha=0,
 plot(p2p2_cv_ridgem)
 print(p2p2_cv_ridgem)
 
-p2p2_optimal_ridgem <- glmnet::glmnet(x=p2p2_pred, y=p2p2_out, family="gaussian", alpha=0, lambda=0.74)
+p2p2_optimal_ridgem <- glmnet::glmnet(x=p2p2_pred, y=p2p2_out, family="gaussian", alpha=0, lambda=p2p2_cv_ridgem$lambda.min)
 #plot
 cf1 <- c()
 cf2 <- c()
@@ -265,7 +267,8 @@ ggplot(data=cf, aes(x=cf1, y=cf2)) +
         axis.title.x = element_text(face="bold", colour="red", size = 12),
         axis.title.y = element_text(face="bold", colour="red", size = 12))
 ```
-The value of lambda that minimizes the expected prediction error is 0.74 according to the 10 fold cross validation. I stick with the suggested lambda value for the model, because based on the plot, expected prediction error picks up pretty obviously as lambda increases.
+
+I choose the suggested lambda value that minimizes the expected prediction error under the 10 fold cross validation, because from the plot, expected prediction error picks up obviously as lambda increases.
 
 Based on the plot, the important predictors are season9, season8, season7, season6, season5,
 season4, season3, season1, randall_einhorn, paul_lieberstein, paul_feig, greg_daniels, and gene_stupnitsky, whereas the rest of the predictors are not.
@@ -309,7 +312,8 @@ ggplot(data=cf, aes(x=cf1, y=cf2)) +
         axis.title.x = element_text(face="bold", colour="red", size = 12),
         axis.title.y = element_text(face="bold", colour="red", size = 12))
 ```
-The value of lambda that minimizes the expected prediction error is 0.03343 according to the 10 fold cross validation. I stick with the suggested lambda value for the model, because based on the plot, expected prediction error picks up pretty obviously as lambda increases.
+
+I choose the suggested lambda value that minimizes the expected prediction error under the 10 fold cross validation, because from the plot, expected prediction error picks up obviously as lambda increases.
 
 Based on the plot, the important predictors are season8, season6, season3, season1, paul_feig, and greg_daniels, whereas the rest of the predictors are not.
 
@@ -328,6 +332,7 @@ data.frame(
   epe_optimal_ridge = min(p2p2_cv_ridgem$cvm),
   epe_optimal_lasso = min(p2p3_cv_lassom$cvm))
 ```
+
 According to the above comparison, the optimal ridge and lasso models have similar performance on expected prediction errors that are both lower than the OLS models.
 
 ```{r}
@@ -355,6 +360,7 @@ data.frame(
   mse_optimal_ridge = mse(o_test$imdb_rating, o_test$optimal_ridge),
   mse_optimal_lasso = mse(o_test$imdb_rating, o_test$optimal_lasso))
 ```
+
 Yes, the same result holds in the heldout test data, where the optimal ridge and lasso models perform better than full and subset OLS models.
 
 ## Problem 3: A Nifty Identity for Cubic Regression Splines (15 pts)
@@ -411,6 +417,7 @@ lmApprochPlot
 ```
 
 Using a measure of expected prediction error appropriate for a standard linear model, find the order of global polynomial that minimizes EPE.  Be sure to note your choice and why you made it.  Using this value, train your model on the full training set and plot the prediction curve implied by the polynomial model on your graph.
+
 ```{r}
 # we reuse the function from problem set 2 for the wealth of non-simulation based estimates of the expected prediction error to make this decision
 lm_pred_metrics <- function(fit_model) {
@@ -481,6 +488,7 @@ polyPredResultPlot
 ```
 
 Next, estimate a cubic natural spline and a smoothing spline using the entire training data.  For the natural spline, you need to choose the number of knots or degrees of freedom.  I would recommend setting these to 5 to start and playing with it until you get something that looks right.  For the smoothing spline, you should choose the final form using a built-in cross-validation method (most likely GCV).  Add the prediction curve to your plot.  How do the drawn curves differ between methods?
+
 ```{r}
 #natural spline(cubic)
 #find the optimal df with our measure of EPE
@@ -550,6 +558,7 @@ predResultPlot
 ```
 
 Finally, use your polynomial model and splines to create predictions for the test set and quantify the mean squared error for the test set.  Which model performs best?  Worst?  Provide some rationale for this outcome.
+
 ```{r}
 #recode testing dataframe
 c_test_q4 <- c_test
@@ -620,9 +629,11 @@ c_lasso_largeLambda$beta
 c_test_q4_selected<-data.frame(Outstate=c_test_q4$Outstate,Private=c_test_q4$Private,S.F.Ratio=c_test_q4$S.F.Ratio,PhD=c_test_q4$PhD,perc.alumni=c_test_q4$perc.alumni,Grad.Rate=c_test_q4$Grad.Rate)
 c_train_q4_selected<-data.frame(Outstate=c_train_q4$Outstate,Private=c_train_q4$Private,S.F.Ratio=c_train_q4$S.F.Ratio,PhD=c_train_q4$PhD,perc.alumni=c_train_q4$perc.alumni,Grad.Rate=c_train_q4$Grad.Rate)
 ```
+
 Using the selected variables, estimate a GAM model that best predicts log out of state tuition.  Try different combinations of linear terms, spline terms, and thin-plate/tensor spline terms to try to minimize the GCV associated with your GAM.  Most implementations will return this as part of the model object.
 
 *Note*: There is no exhaustive way to find the actual GCV minimizer using GAMs.  You'll just need to use intuition to determine what variables have significant **interactions** that should be included in the model building step.
+
 ```{r}
 #try to build model with GAM
 # if we include all variables in smooth, the model and gcv is:
@@ -716,6 +727,7 @@ plot(bestTEModel,pages=1)
 ```
 
 Create a plot that shows the function for each predictor.  Do the marginal relationships make sense?  For any 2-predictor spline terms, do they capture anything that wouldn't be captured by a linear model?
+
 ```{r}
 #gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+s(Grad.Rate,Phd)
 optGAMModel<-bestSModel 
@@ -726,6 +738,7 @@ plot(optGAMModel)
 ```
 
 Look at your function for `S.F.Ratio`.  Does it look like the smoothing spline you uncovered in part 1?  What does this say about the plausibility of the additivity assumption for this specific variable?
+
 ```{r}
 # s(df$x1, df$x2) is s(Grad.Rate,Phd)
 summary(optGAMModel)
@@ -735,6 +748,7 @@ summary(optGAMModel)
 ### Part 4 (5 pts)
 
 Finally, let's compare both models to see which one performs best on the out of sample data.  Create predictions using your LASSO model and GAM for the out of sample test data.  Use these predictions to compute the out of sample MSE for each method.  Which performs best?
+
 ```{r}
 #GAM model:optGAMModel
 GamPredmodel<-gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+s(Grad.Rate,PhD),data=c_train_q4_selected,family = gaussian())
