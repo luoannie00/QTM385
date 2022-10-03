@@ -148,7 +148,7 @@ $$
 \hat {\boldsymbol \beta}_{LASSO} &=& \text{sign} \left(\hat{\boldsymbol{\beta}}_{OLS} \right) * \left(|\hat{\boldsymbol{\beta}}_{OLS}| - \lambda \right)
 \end{eqnarray}
 $$
-
+Ridge shrinks coefficients toward 0 because as $\lambda$ increases, the denominator increases and thus $\boldsymbol{\hat{\beta}_{Ridge}}$ decreases. However, unless $\lambda$ goes to infinity, increasing the denominator can never shrink the fraction into exactly 0. LASSO shrinks coefficients toward 0 because as $\lambda$ increases to a value that is equal to $|\hat{\boldsymbol{\beta}}_{OLS}|$, $\hat {\boldsymbol \beta}_{LASSO}$ goes to 0. LASSO coefficients can reach exactly 0 because it's possible for $\lambda$ to be exactly $|\hat{\boldsymbol{\beta}}_{OLS}|$.
 
 ## Problem 2: Applying Ridge and LASSO (35 pts)
 
