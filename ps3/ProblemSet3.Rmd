@@ -1,12 +1,13 @@
 
 ---
-title: "Problem Set #3"
+title: 'Problem Set #3'
 author: "Kevin McAlister"
 date: "`r Sys.Date()`"
 output:
-  pdf_document:
+  html_document:
     toc: no
     toc_depth: '2'
+    df_print: paged
   prettydoc::html_pretty:
     df_print: kable
     theme: leonids
@@ -15,6 +16,9 @@ output:
     toc_depth: 2
     toc_float:
       collapsed: no
+  pdf_document:
+    toc: no
+    toc_depth: '2'
 urlcolor: blue
 ---
 
@@ -210,7 +214,7 @@ ggplot(data=cf, aes(x=rownames.cf., y=Estimate)) +
 ```
 From the plot, we see that predictors season3, season1, paul_lieberstein, mindy_kaling, justin_spitzer, greg_daniels, and b_j_novak seem important, while the rest don't.
 
-```{r p2p1}
+```{r}
 #subset of important predictors
 p2p1_imp_pred <- o_train %>% select(seasonSeason.3, seasonSeason.1, paul_lieberstein, mindy_kaling, justin_spitzer, greg_daniels, b_j_novak, imdb_rating)
 
@@ -326,7 +330,7 @@ data.frame(
 ```
 According to the above comparison, the optimal ridge and lasso models have similar performance on expected prediction errors that are both lower than the OLS models.
 
-```{r p2p4}
+```{r}
 #delete variable episode_name
 o_test <- o_test %>% select(-episode_name)
 
@@ -390,16 +394,10 @@ Since the function is three-times differentiable, the second derivative of the f
 
 ## Problem 4: Nonlinear Regression Methods (35 pts)
 
-The data sets `college_train.csv` (600 observations) and `college_test.csv` (177 observations) include information about different colleges in the U.S.  We're going to use this data set to try to build a model that predicts the logarithm of out of state tuition for a college using a variety of predictors related to college quality.  Note that this data was collected back in 1995 - a magical time in U.S. history where "Run Around" by Blues Traveler was playing on the radio, Bill Clinton had a plan to actually balance the U.S. budget, and young Dr. McAlister learned to tie his shoes in Ms. Lamb's first grade class.  It is also notable that college used to be affordable!  Don't be too downtrodden when you look at this data set and see Emory's out of state tuition back then...
-
-As always, the test set is intended to be used only for quantifying expected prediction error after choosing some trained models.  A description of the variables in the data set can be found [here](https://www.rdocumentation.org/packages/ISLR/versions/1.4/topics/College).  I've added an additional predictor called `AcceptRate` which is the acceptance rate of the school in 1995.
-
-Note: I would recommend just recoding `Outstate = log(Outstate)` right at the beginning.
-
 ### Part 1 (10 pts)
 
 Let's start by looking at a single predictor - the student/faculty ratio `S.F.Ratio`.  Plot log out of state tuition against the student/faculty ratio.  Does this look linear?
-```{r p4p1, warning=FALSE}
+```{r}
 #initial recoding: use c_train_q4 moving on for consistence
 c_train_q4 <- c_train
 c_train_q4$Outstate <- log(c_train$Outstate)
@@ -413,7 +411,7 @@ lmApprochPlot
 ```
 
 Using a measure of expected prediction error appropriate for a standard linear model, find the order of global polynomial that minimizes EPE.  Be sure to note your choice and why you made it.  Using this value, train your model on the full training set and plot the prediction curve implied by the polynomial model on your graph.
-```{r p4p1}
+```{r}
 # we reuse the function from problem set 2 for the wealth of non-simulation based estimates of the expected prediction error to make this decision
 lm_pred_metrics <- function(fit_model) {
   
@@ -483,7 +481,7 @@ polyPredResultPlot
 ```
 
 Next, estimate a cubic natural spline and a smoothing spline using the entire training data.  For the natural spline, you need to choose the number of knots or degrees of freedom.  I would recommend setting these to 5 to start and playing with it until you get something that looks right.  For the smoothing spline, you should choose the final form using a built-in cross-validation method (most likely GCV).  Add the prediction curve to your plot.  How do the drawn curves differ between methods?
-```{r p4p1}
+```{r}
 #natural spline(cubic)
 #find the optimal df with our measure of EPE
 p4_1_num <- seq(1,20,1)
@@ -521,7 +519,7 @@ ggplot(data=p4_1_dat) +
   theme_bw()
 ```
 
-```{r p4p1}
+```{r}
 #optimal Natural Spline model
 optimalCubicModel <- lm(Outstate ~ ns(S.F.Ratio,df=4), data=c_train_q4)
 nsPredResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,
@@ -536,7 +534,7 @@ predResultPlot <- ggplot(data=nsPredResult) +
 predResultPlot
 ```
 
-```{r p4p1}
+```{r}
 #optimal smoothing spline model
 optimalSSModel <- smooth.spline(x=c_train_q4$S.F.Ratio, y=c_train_q4$Outstate)
 ssPredResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,predOutState=predict(optimalSSModel, x=c_train_q4$S.F.Ratio),                         originalOutState=c_train_q4$Outstate)
