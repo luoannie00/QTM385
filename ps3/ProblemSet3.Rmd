@@ -279,13 +279,14 @@ p2p3_out <- data.matrix(o_train$imdb_rating)
 
 #100 possible values of lambda
 p2p3_lassom <- glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, nlambda=100)
-print(p2p3_lassom)
+#print(p2p3_lassom)
 
 p2p3_cv_lassom <- cv.glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, nfolds=10, type.measure="mse")
 plot(p2p3_cv_lassom)
 print(p2p3_cv_lassom)
 
-p2p3_optimal_lassom <- glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, lambda=0.03343)
+#0.03343 is the initial p2p3_cv_lassom$lambda.min we get
+p2p3_optimal_lassom <- glmnet(x=p2p3_pred, y=p2p3_out, family="gaussian", alpha=1, lambda=p2p3_cv_lassom$lambda.min)
 #plot
 cf1 <- c()
 cf2 <- c()
@@ -579,10 +580,14 @@ lasso_outcome <- data.matrix(c_train_q4$Outstate)
 c_lasso <- glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, nlambda=100)
 print(c_lasso)
 c_lasso_cv <- cv.glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, nfolds=10, type.measure="mse")
-#plot(p2p3_cv_lassom)
 print(c_lasso_cv)
+# we get 0.006769453 from c_lasso_cv$lambda.min
+optimalLambda<-0.006769453
+c_lasso_optimal <- glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, lambda=optimalLambda)
 
-#c_optimal_lassom <- glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, lambda=0.03343)
+#there are 14 variables in our optimal list (shown below)
+variableList<-c_lasso_optimal$beta
+variableList
 ```
 
 
