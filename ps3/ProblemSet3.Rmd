@@ -752,5 +752,6 @@ p4p4_mseOutput
 
 In a few sentences, discuss the practical limitations of the LASSO and GAM approach used in part 3.  When will this kind of process not be viable?
 
-
-
+The LASSO and GAM approach used in part 3 allows us to pick variable with our own intuition based on some level of logical algorithm analysis.
+When interactions between variables are significant, we might miss some of those interactions by dropping out some of the variables in the LASSO process.
+Besides, with GAM, our final *optimal model is highly decided by our human intuition. It does allow us for more freedom on model selection, but also might leads to relatively high bias when we are biased/ don't have enough knowledge about the data background.
