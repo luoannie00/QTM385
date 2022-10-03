@@ -630,8 +630,10 @@ Using the selected variables, estimate a GAM model that best predicts log out of
 # if we include all variables in smooth, the model and gcv is:
 fullGam<-gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate),data=c_train_q4_selected,family = gaussian())
 fullGamGcv<-fullGam$gcv.ubre.dev
+print("The gcv for optimal model is")
 fullGamGcv
 ```
+
 ```{r}
 #if we want to include one interaction term w te() tensor spline
 temMinGcv<-100
@@ -657,10 +659,12 @@ for (i in 3:6){
     }
   }
 }
-# gcv and interaction terms are:
+# result
+print("The gcv for optimal model is")
 temMinGcv # also the smallest gcv we got so far
-c_train_q4_selected[num1]
-c_train_q4_selected[num2]
+print("The interaction is between:")
+names(c_train_q4_selected[num1])
+names(c_train_q4_selected[num2])
 ```
 
 ```{r}
@@ -688,84 +692,65 @@ for (i in 3:6){
     }
   }
 }
-sMinGcv
-c_train_q4_selected[snum1]
-c_train_q4_selected[snum2]
+#plot(bestSModel,pages=1)
+
+print("The gcv for optimal model is")
+sMinGcv 
+print("The interaction is between:")
+names(c_train_q4_selected[snum1])
+names(c_train_q4_selected[snum2])
 ```
 
 ```{r}
-# so we have:
-#bestTEModel
-#bestSModel
-#fullGam
-plot(bestTEModel,pages=1)
+# so we have three optimal models with/without interaction in various formula:
+#gcv we got for each model:
+gcvSum<-data.frame(fullGamGCV=fullGamGcv,bestTEGCV=temMinGcv ,bestSGCV=sMinGcv)
+gcvSum
+#best Model with one s(interaction) term
+#gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+s(Grad.Rate,Phd)
 plot(bestSModel,pages=1)
+#fullGam model simply s() on everything
+#gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)
 plot(fullGam,pages=1)
+#best Model with one TE(interaction) term
+#gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+te(perc.alumni,S.F.Ratio)
+plot(bestTEModel,pages=1)
 ```
 
-Create a plot that shows the function for each predictor.  Do the marginal relationships make sense?  For any 2-predictor spline terms, do they capture anything that wouldn't be captured by a linear model?  
+Create a plot that shows the function for each predictor.  Do the marginal relationships make sense?  For any 2-predictor spline terms, do they capture anything that wouldn't be captured by a linear model?
+```{r}
+#gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+s(Grad.Rate,Phd)
+optGAMModel<-bestSModel 
+plot(optGAMModel)
+#We decide to go with this model as it gives as the relatively low gcv with interactions between Grad.Rate and Phd (somewhat) makes more sense than other models we got.
+#The marginal relationship makes sense most of the predictors. For PhD and perc.alumni, it makes sense the functions don't change much while the value of those variable change.For S.F.Ratio, it also makes sense that when the ratio is lower it matters more to out of state tuition.(vice versa for Grad.Rate)
+#For 2-predictor spline terms, we could see from the last graph that our optimal model does capture relation that won't be captured by a linear model.
+```
 
 Look at your function for `S.F.Ratio`.  Does it look like the smoothing spline you uncovered in part 1?  What does this say about the plausibility of the additivity assumption for this specific variable?
-
-Be sure to note your "optimal" model and why you chose that one.  Your search doesn't need to be exhaustive (that's impossible), just a reasonable attempt to get a good predictive model!
-
-*Note*: You can think of the curve produced by the GAM for a given predictor as an additive value.  For example, if we see that the curve for S.F.Ratio is at -.1 when S.F.Ratio is equal to 5, then we can say that observing an S.F.Ratio = 5 means that we are subtracting .1 from our overall prediction. 
+```{r}
+# s(df$x1, df$x2) is s(Grad.Rate,Phd)
+summary(optGAMModel)
+#The function we got from the first graph above is quite similar with the shape of what we uncovered in part1. It might imply that S.F.Ratio is additive to the GAM model in the way that we structure it.(as we could see in the summary, we have a quite low p-value for S.F.Ratio.)
+```
 
 ### Part 4 (5 pts)
 
 Finally, let's compare both models to see which one performs best on the out of sample data.  Create predictions using your LASSO model and GAM for the out of sample test data.  Use these predictions to compute the out of sample MSE for each method.  Which performs best?
+```{r}
+#GAM model:optGAMModel
+GamPredmodel<-gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+s(Grad.Rate,PhD),data=c_train_q4_selected,family = gaussian())
+newd<-data.frame(Private=c_train_q4$Private,S.F.Ratio=c_train_q4$S.F.Ratio,PhD=c_train_q4$PhD,perc.alumni=c_train_q4$perc.alumni,Grad.Rate=c_train_q4$Grad.Rate)
+mse_GAM<-mse(c_test_q4_selected$Outstate,predict.gam(GamPredmodel,newd))
+#LASaO model: c_lasso_optimal
+lasso_predictor <- data.matrix(c_test_q4[,-9])
+mse_Lasoo<-mse(c_test_q4$Outstate,predict(c_lasso_optimal,newx=lasso_predictor))
+p4p4_mseOutput<-data.frame(GAM_mse=mse_GAM,Lasoo_mse=mse_Lasoo)
+p4p4_mseOutput
+#If we take mse data below as reference, Lasso performs better than our GAM model.
+```
 
 In a few sentences, discuss the practical limitations of the LASSO and GAM approach used in part 3.  When will this kind of process not be viable?
 
 
 
-
-***
-
-## Discussion on Computational Resources
-
-### `glmnet`
-
-I'm going to provide some guidance on implementing Ridge and LASSO in R and Python.  For these problems, I highly recommend using the package `glmnet` in both R and Python.  The vignette for R can be found [here](https://cran.r-project.org/web/packages/glmnet/vignettes/glmnet.pdf) and the vignette for the Python package can be found [here](https://glmnet-python.readthedocs.io/en/latest/glmnet_vignette.html#Usage).  This package was developed by the authors of ESL and ISLR as a general purpose implementation of the Elastic Net for estimating regression coefficients.  The packages is C++ and Fortran optimized, meaning that it absolutely beats the pants off of other implementations in terms of computational speed.  It also has built in functions and favorable construction for plotting regularization paths and choosing $\lambda$ via cross validation.  There are a million and one more implementations, but I think that this one is the best for our purposes.
-
-A first note is that the main function `glmnet` does not take formula inputs - e.g. `y ~ x1 + x2`.  Rather, it requires that you pass it a vector or matrix of outcome values, `y`, and a $N \times P$ matrix of predictors, `x`.  This is a design choice that is implemented to prevent people from using `glmnet` to mine their way to "victory" in finding the best predictive model.  One thing that we've seen is that we may want to consider basis expansions (`poly()` in R) or multiplicative interactions between predictors (`x1*x2` in R).  The formula language makes this implementation easy - maybe too easy.  Since Ridge and LASSO are essentially indiscriminately setting some number of predictors to zero, this would lead to nonsense models that have interaction terms without their constituent marginal components and broken basis expansions.  Rather than implement smart grouping features, the authors of the package discourage this by making you construct the predictor set rather than creating "user-friendly" niceties - when you see how big $P$ is for the full model, you'll often rethink whether or not you truly believe it's necessary!
-
-`glmnet` models the intercept separately.  This is because it makes little sense to penalize the estimate of the intercept.  So, you do not need to include a column of 1s in your predictor matrix.
-
-There is one case where this construction leads to some pain - dummying out or one-hot encoding unordered categorical predictors.  For example, the season in the Office problem above should be treated as an unordered categorical predictor.  Typically, we can set `season` to be a factor and the formula language in R will deal with it for you.  However, `glmnet` requires us to do it ourselves. 
-
-To process the training and test data to "one-hot encode" the season of the episode, we need to convert the unordered categorical variable with $M$ categories to $M$ separate predictors that take a value of 1 if they are in that group and 0 otherwise.  For example, a variable called `Season 9` would take a value of 1 if the episode was in season 9 and 0 otherwise.  If the unordered categorical variable is a factor in a data frame, then there is an easy way to do it in R using the `caret` package and the function `dummyVars`:
-```{r, include=TRUE, eval = FALSE}
-train$season <- factor(train$season)
-dummy_train <- caret::dummyVars(" ~ .", data = train)
-train <- data.frame(predict(dummy_train, newdata = train))
-```
-which takes a data frame with factor columns and returns another data frame with all factor columns dummied out and the rest of the columns intact.  In Python, `OneHotEncoder` in `sklearn` will achieve the same thing.  There are also ways to do this manually, so do what is easiest for you.
-
-Another point is that `glmnet` standardizes all of the predictors.  Using a single $\lambda$ shrinkage parameter works best when all predictors are on the same scale.  This leads to standardized regression coefficients that are interpreted similarly - a 1 standard deviation change in X results in a $\beta$ unit change in Y.  This standardization can be done by the user, but it is not recommended since `glmnet` implements the standardization in a specific way.  This can lead to some weirdness when trying to predict new values of the outcome using a specific $\lambda$ value, so it is recommended that you use the built-in `predict` function to do this.
-
-`glmnet` has a lot of arguments.  But, we only really need to look at a few of them:
-
-  1. `x` and `y` - the input predictors and outcomes
-  
-  2. `family` - for now, we only need `family = "gaussian"`.  `glmnet` can do ridge or LASSO penalized generalized linear models - most importantly logistic regression.  Since we're only working with linear regression, we are assuming Gaussian distributed errors.
-  
-  3. `alpha` - the value for the exponent of the Elastic Net penalty.  `alpha = 0` corresponds to ridge regression while `alpha = 1` corresponds to LASSO regression.
-  
-  4. `nlambda` - the number of $\lambda$ values to consider when fitting the regularization path.  `glmnet` is smart and figures out good values for the minimum and maximum $\lambda$ to be considered.  This controls how granular the path of $\lambda$ checked is.  The default of 100 is usually more than enough.
-  
-  5. `lambda` - there's no need to do this!  Just fit the full path of $\lambda$ values and extract via `predict` or `coefs`.
-  
-Everything else is only needed for very specific circumstances.  If you need to change one of these from the defaults, you'll know.
-
-Two other functions of importance: 1) `predict` and 2) `cv.glmnet`.  
-
-`predict` for a `glmnet` object will take in new values of x and return the value of $\hat{y}$.  `newx` should be a $M \times P$ matrix of $M$ new observations.  `s` is the value of $\lambda$ at which predictions are to be made.  `type` is not relevant for linear regression, but can be used to change what level of $\hat{y}$ is computed (more to come in a few weeks).
-
-`cv.glmnet` will create random partitions within the provided training data to do $K$-fold cross validation.  This approach is 100% superior to any implementation you will write yourself, so just use this for computing cross-validation estimates of the expected prediction error.  The arguments for `cv.glmnet` include all of the arguments for `glmnet` with two additional important inputs:
-
-  1. `nfolds` - the number of disjoint folds to create within the training data.  Default is 10 and is usually a good choice.
-  
-  2. `type.measure` - the loss function to consider when computing the estimate of the expected prediction error.  The default is to compute deviance, $-2 \ell \ell$, for the regression model.  Note that this is equivalent to MSE for the Gaussian model.  Two other common choices - `mse` and `mae`.  The choice here should be informed by what loss you're trying to minimize.  MSE works well for our purposes, but may not make sense in other contexts.
-  
-With `cv.glmnet`, you can plot the $K$-fold curve for all attempted values of $\lambda$ and search for a meaningful minimum.  It will also return the minimum loss $\lambda$ and the one standard error value of $\lambda$.  Your choice here should be informed by the problem, but is unlikely to make a significant difference in your conclusions.
