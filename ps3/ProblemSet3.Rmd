@@ -24,6 +24,7 @@ library(glmnet)
 library(caret)
 library(Metrics)
 library(splines)
+library(mgcv)
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
 
@@ -579,10 +580,13 @@ lasso_outcome <- data.matrix(c_train_q4$Outstate)
 
 c_lasso <- glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, nlambda=100)
 print(c_lasso)
+
 c_lasso_cv <- cv.glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, nfolds=10, type.measure="mse")
 print(c_lasso_cv)
-# we get 0.006769453 from c_lasso_cv$lambda.min
-optimalLambda<-0.006769453
+plot(c_lasso_cv)
+
+optimalLambda<-c_lasso_cv$lambda.min
+smallVarLambda<-c_lasso_cv$lambda.1se
 c_lasso_optimal <- glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, lambda=optimalLambda)
 
 #there are 14 variables in our optimal list (shown below)
@@ -598,14 +602,106 @@ Now, let's see if we can improve on the standard LASSO regression model using a 
   1. Use all of the predictors.
   2. Only use the predictors selected by LASSO under your optimal model.
   3. Try to fit the GAM with an even smaller model using a subset of predictors from a higher sparsity point on the LASSO path.
-  
+
 Since we can only estimate a GAM with terms and interactions that we know to put in, it can be really difficult to find the optimal model.  This means that Option 2 or 3 is probably your best bet for this particular problem.  The benefit of taking this subset approach is that we can really try to model meaningful non-linearities and **interactions** between features.
   
 Use the LASSO regularization path for your LASSO model estimated in part 2 to pick the model with **at most** 6 predictors that minimizes expected prediction error.  To select the included coefficients, I highly recommend that you leverage the plots produced by `glmnet` to find the corresponding $\lambda$.  Then, using the chosen value of $\lambda$, find the set of non-zero coefficients.  Regardless of your choice, your model should include `S.F.Ratio` (though I'm pretty sure that this variable will pop up pretty early along the LASSO regularization path!).
-
+```{r}
+#We decide to go with the second approach
+# From the plot() and cv function in part two, we alreay know the min mse Lambda(optimalLambda) and largest value of lambda that error within 1 standard error of the min.(smallVarLambda) as the following:
+optimalLambda<-c_lasso_cv$lambda.min
+smallVarLambda<-c_lasso_cv$lambda.1se
+# models trained with these two lambda values 
+c_lasso_optimal <- glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, lambda=optimalLambda)
+c_lasso_largeLambda <- glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, lambda=smallVarLambda)
+# print the included predictors
+c_lasso_optimal$beta
+c_lasso_largeLambda$beta
+#In conclusion, we pick the following 5 predictors:
+  #Private/S.F.Ratio/PhD/perc.alumni/Grad.Rate
+c_test_q4_selected<-data.frame(Outstate=c_test_q4$Outstate,Private=c_test_q4$Private,S.F.Ratio=c_test_q4$S.F.Ratio,PhD=c_test_q4$PhD,perc.alumni=c_test_q4$perc.alumni,Grad.Rate=c_test_q4$Grad.Rate)
+c_train_q4_selected<-data.frame(Outstate=c_train_q4$Outstate,Private=c_train_q4$Private,S.F.Ratio=c_train_q4$S.F.Ratio,PhD=c_train_q4$PhD,perc.alumni=c_train_q4$perc.alumni,Grad.Rate=c_train_q4$Grad.Rate)
+```
 Using the selected variables, estimate a GAM model that best predicts log out of state tuition.  Try different combinations of linear terms, spline terms, and thin-plate/tensor spline terms to try to minimize the GCV associated with your GAM.  Most implementations will return this as part of the model object.
 
 *Note*: There is no exhaustive way to find the actual GCV minimizer using GAMs.  You'll just need to use intuition to determine what variables have significant **interactions** that should be included in the model building step.
+```{r}
+#try to build model with GAM
+# if we include all variables in smooth, the model and gcv is:
+fullGam<-gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate),data=c_train_q4_selected,family = gaussian())
+fullGamGcv<-fullGam$gcv.ubre.dev
+fullGamGcv
+```
+```{r}
+#if we want to include one interaction term w te() tensor spline
+temMinGcv<-100
+#summary()
+for (i in 3:6){
+  for (j in 3:6){
+    if (i==j){
+      break
+    }
+    df<-data.frame(c_train_q4_selected[i],c_train_q4_selected[j],c_train_q4_selected[1])
+    names(df)[1] <- "x1"
+    names(df)[2] <- "x2"
+    names(df)[3] <- "y"
+    tempModel<-gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+te(df$x1,df$x2),
+               data=c_train_q4_selected,
+               family = gaussian())
+    tempGcv<-tempModel$gcv.ubre.dev
+    if (temMinGcv>tempGcv){
+      temMinGcv<-tempGcv
+      num1<-i
+      num2<-j
+      bestTEModel<-tempModel
+    }
+  }
+}
+# gcv and interaction terms are:
+temMinGcv # also the smallest gcv we got so far
+c_train_q4_selected[num1]
+c_train_q4_selected[num2]
+```
+
+```{r}
+#if we want to include one interaction term w s()
+sMinGcv<-100
+#summary()
+for (i in 3:6){
+  for (j in 3:6){
+    if (i==j){
+      break
+    }
+    df<-data.frame(c_train_q4_selected[i],c_train_q4_selected[j],c_train_q4_selected[1])
+    names(df)[1] <- "x1"
+    names(df)[2] <- "x2"
+    names(df)[3] <- "y"
+    tempModel<-gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+s(df$x1,df$x2),
+               data=c_train_q4_selected,
+               family = gaussian())
+    tempGcv<-tempModel$gcv.ubre.dev
+    if (sMinGcv>tempGcv){
+      sMinGcv<-tempGcv
+      snum1<-i
+      snum2<-j
+      bestSModel<-tempModel
+    }
+  }
+}
+sMinGcv
+c_train_q4_selected[snum1]
+c_train_q4_selected[snum2]
+```
+
+```{r}
+# so we have:
+#bestTEModel
+#bestSModel
+#fullGam
+plot(bestTEModel,pages=1)
+plot(bestSModel,pages=1)
+plot(fullGam,pages=1)
+```
 
 Create a plot that shows the function for each predictor.  Do the marginal relationships make sense?  For any 2-predictor spline terms, do they capture anything that wouldn't be captured by a linear model?  
 
