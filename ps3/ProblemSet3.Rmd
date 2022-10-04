@@ -1,7 +1,6 @@
 
 ---
 title: 'Problem Set #3'
-author: "Kevin McAlister"
 date: "`r Sys.Date()`"
 output:
   html_document:
@@ -33,7 +32,7 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 1
 ```
 
 ```{r}
-setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps3')
+#setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps3')
 #setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/ps3')
 rm(list = ls())
 c_test <- read.csv('college_test.csv')
@@ -362,7 +361,8 @@ data.frame(
   mse_optimal_lasso = mse(o_test$imdb_rating, o_test$optimal_lasso))
 ```
 
-Yes, the same result holds in the heldout test data, where the optimal ridge and lasso models perform better than full and subset OLS models.
+Yes, the same result holds in the heldout test data, where the optimal ridge and lasso models perform better than full and subset OLS models. The ridge and lasso models improve EPE for the problem by selecting important variables and ignoring the rest of the noise variables. In that way, model variance is reduced since the ridge and lasso models are less likely to overfit to the training data, therefore improving EPE.
+
 
 ## Problem 3: A Nifty Identity for Cubic Regression Splines (15 pts)
 
@@ -655,6 +655,7 @@ print("The gcv for optimal model is")
 fullGamGcv
 ```
 
+
 ```{r}
 #if we want to include one interaction term w te() tensor spline
 temMinGcv<-100
@@ -722,10 +723,47 @@ names(c_train_q4_selected[snum1])
 names(c_train_q4_selected[snum2])
 ```
 
+
 ```{r}
-# so we have three optimal models with/without interaction in various formula:
+#if we want to include one interaction term with tensor interaction ti()
+tiMinGcv<-100
+#summary()
+for (i in 3:6){
+  for (j in 3:6){
+    if (i==j){
+      break
+    }
+    df<-data.frame(c_train_q4_selected[i],c_train_q4_selected[j],c_train_q4_selected[1])
+    names(df)[1] <- "x1"
+    names(df)[2] <- "x2"
+    names(df)[3] <- "y"
+    tempModel<-gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+ti(df$x1,df$x2),
+               data=c_train_q4_selected,
+               family = gaussian())
+    tempGcv<-tempModel$gcv.ubre.dev
+    if (tiMinGcv>tempGcv){
+      tiMinGcv<-tempGcv
+      tinum1<-i
+      tinum2<-j
+      bestTiModel<-tempModel
+    }
+  }
+}
+#plot(bestSModel,pages=1)
+
+print("The gcv for optimal model is")
+tiMinGcv 
+print("The interaction is between:")
+names(c_train_q4_selected[tinum1])
+names(c_train_q4_selected[tinum2])
+```
+
+
+
+```{r}
+# so we have four optimal models with/without interaction in various formula:
 #gcv we got for each model:
-gcvSum<-data.frame(fullGamGCV=fullGamGcv,bestTEGCV=temMinGcv ,bestSGCV=sMinGcv)
+gcvSum<-data.frame(fullGamGCV=fullGamGcv,bestTEGCV=temMinGcv ,bestSGCV=sMinGcv,bestTIGCV=tiMinGcv)
 gcvSum
 #best Model with one s(interaction) term
 #gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+s(Grad.Rate,Phd)
@@ -736,6 +774,9 @@ plot(fullGam,pages=1)
 #best Model with one TE(interaction) term
 #gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+te(perc.alumni,S.F.Ratio)
 plot(bestTEModel,pages=1)
+#best Model with one TI(interaction) term
+#gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+ti(perc.alumni,S.F.Ratio)
+plot(bestTiModel,pages = 1)
 ```
 
 Create a plot that shows the function for each predictor.  Do the marginal relationships make sense?  For any 2-predictor spline terms, do they capture anything that wouldn't be captured by a linear model?
@@ -764,7 +805,6 @@ Finally, let's compare both models to see which one performs best on the out of 
 ```{r}
 #GAM model:optGAMModel
 GamPredmodel<-gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+s(Grad.Rate,PhD),data=c_train_q4_selected,family = gaussian())
-
 mse_GAM<-mse(c_test_q4_selected$Outstate,predict.gam(GamPredmodel,c_test_q4))
 
 #LASaO model: c_lasso_optimal
