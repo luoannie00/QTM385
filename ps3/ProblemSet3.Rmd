@@ -362,6 +362,8 @@ data.frame(
 ```
 
 Yes, the same result holds in the heldout test data, where the optimal ridge and lasso models perform better than full and subset OLS models. The ridge and lasso models improve EPE for the problem by selecting important variables and ignoring the rest of the noise variables. In that way, model variance is reduced since the ridge and lasso models are less likely to overfit to the training data, therefore improving EPE.
+
+
 ## Problem 3: A Nifty Identity for Cubic Regression Splines (15 pts)
 
 Regression splines are a broadly applicable method for regression analysis because they can be represented and estimated as an augmented OLS problem.
