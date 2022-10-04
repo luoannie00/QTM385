@@ -33,9 +33,9 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 1
 ```
 
 ```{r}
-#setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps3')
+setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps3')
 #setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/ps3')
-#rm(list = ls())
+rm(list = ls())
 c_test <- read.csv('college_test.csv')
 c_train <- read.csv('college_train.csv')
 o_test <- read.csv('office_test.csv')
@@ -148,6 +148,7 @@ $$
 \hat {\boldsymbol \beta}_{LASSO} &=& \text{sign} \left(\hat{\boldsymbol{\beta}}_{OLS} \right) * \left(|\hat{\boldsymbol{\beta}}_{OLS}| - \lambda \right)
 \end{eqnarray}
 $$
+
 Ridge shrinks coefficients toward 0 because as $\lambda$ increases, the denominator increases and thus $\boldsymbol{\hat{\beta}_{Ridge}}$ decreases. However, unless $\lambda$ goes to infinity, increasing the denominator can never shrink the fraction into exactly 0. LASSO shrinks coefficients toward 0 because as $\lambda$ increases to a value that is equal to $|\hat{\boldsymbol{\beta}}_{OLS}|$, $\hat {\boldsymbol \beta}_{LASSO}$ goes to 0. LASSO coefficients can reach exactly 0 because it's possible for $\lambda$ to be exactly $|\hat{\boldsymbol{\beta}}_{OLS}|$.
 
 ## Problem 2: Applying Ridge and LASSO (35 pts)
@@ -403,7 +404,7 @@ Since the function is three-times differentiable, the second derivative of the f
 ### Part 1 (10 pts)
 
 Let's start by looking at a single predictor - the student/faculty ratio `S.F.Ratio`.  Plot log out of state tuition against the student/faculty ratio.  Does this look linear?
-```{r}
+```{r, warning=FALSE}
 #initial recoding: use c_train_q4 moving on for consistence
 c_train_q4 <- c_train
 c_train_q4$Outstate <- log(c_train$Outstate)
@@ -473,7 +474,7 @@ ggplot(data=p4p1_df) +
 ```{r p4p1}
 #optimal polynomial model 
 #train the model with third degree of polynomial
-optimalPolyModel <- lm(c_train_q4$Outstate ~ poly(c_train_q4$S.F.Ratio,3))
+optimalPolyModel <- lm(data=c_train_q4, Outstate ~ poly(S.F.Ratio,3))
 polyPredResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,
                          predOutState=optimalPolyModel$fitted.values,
                          originalOutState=c_train_q4$Outstate)
@@ -545,7 +546,7 @@ predResultPlot
 ```{r}
 #optimal smoothing spline model
 optimalSSModel <- smooth.spline(x=c_train_q4$S.F.Ratio, y=c_train_q4$Outstate)
-ssPredResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,predOutState=predict(optimalSSModel, x=c_train_q4$S.F.Ratio),                         originalOutState=c_train_q4$Outstate)
+ssPredResult <- data.frame(S.F.Ratio=c_train_q4$S.F.Ratio,predOutState=predict(optimalSSModel, x=c_train_q4$S.F.Ratio), originalOutState=c_train_q4$Outstate)
 predResultPlot <- ggplot(data=ssPredResult) +
   geom_point(aes(x=S.F.Ratio, y=predOutState.y, col='prediction')) +
   geom_point(aes(x=S.F.Ratio, y=originalOutState, col='original')) +
@@ -564,15 +565,18 @@ Finally, use your polynomial model and splines to create predictions for the tes
 c_test_q4 <- c_test
 c_test_q4$Outstate <- log(c_test$Outstate)
 #train three optimal models and calculate mse
-test_poly_MSE = mse(predict(optimalPolyModel,x=c_test_q4$S.F.Ratio),c_test_q4$Outstate)
-test_ns_MSE = mse(predict(optimalCubicModel,x=c_test_q4$S.F.Ratio),c_test_q4$Outstate)
-ssTestPredResult <- data.frame(predOutState=predict(optimalSSModel, x=c_test_q4$S.F.Ratio),                         originalOutState=c_test_q4$Outstate)
-test_ss_MSE = mse(ssTestPredResult$predOutState.y,c_test_q4$Outstate)
-table<-data.frame(polyTestResult=test_poly_MSE,naturalSplineResult=test_ns_MSE,smoothingSplineResult=test_ss_MSE)
+test_poly_MSE = mse(predict(optimalPolyModel,newdata=c_test_q4), c_test_q4$Outstate)
+test_ns_MSE = mse(predict(optimalCubicModel,newdata=c_test_q4), c_test_q4$Outstate)
+test_ss_MSE = mse(predict(optimalSSModel, x=c_test_q4$S.F.Ratio)$y, c_test_q4$Outstate)
+
+table<-data.frame(polyTestResult=test_poly_MSE, 
+                  naturalSplineResult=test_ns_MSE, 
+                  smoothingSplineResult=test_ss_MSE)
 table
 ```
+
 ```{r}
-#From the table above, we can see that the smoothing spline model works the best with the test data. Natural spline model is the worst in term of mse, but polynomial model's mse is also close to the one for natural spline. Since smoothing spline use more knots for spline and have penalization for variation, it makes sense that it performs better than the natural spline.
+#From the table above, we can see that the natural cubic spline model and the smoothing spline model perform similarly well in terms of mse, whereas the third order polynomial model doesn't. It is because the natural cubic spline model and the smoothing spline model divide the dataset into partitions and fit linear models to each partition, which is superior than the third order polynomial model that treats the entire training dataset as one entity. 
 ```
 
 
@@ -585,9 +589,6 @@ Now, let's consider the multivariate case with all of the predictors.  Let's imp
 lasso_predictor <- data.matrix(c_train_q4[,-9])
 lasso_outcome <- data.matrix(c_train_q4$Outstate)
 
-c_lasso <- glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, nlambda=100)
-print(c_lasso)
-
 c_lasso_cv <- cv.glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, nfolds=10, type.measure="mse")
 print(c_lasso_cv)
 plot(c_lasso_cv)
@@ -596,7 +597,7 @@ optimalLambda<-c_lasso_cv$lambda.min
 smallVarLambda<-c_lasso_cv$lambda.1se
 c_lasso_optimal <- glmnet(x=lasso_predictor, y=lasso_outcome, family="gaussian", alpha=1, lambda=optimalLambda)
 
-#there are 14 variables in our optimal list (shown below)
+#there are 13 variables in our optimal list (shown below)
 variableList<-c_lasso_optimal$beta
 variableList
 ```
@@ -626,8 +627,18 @@ c_lasso_optimal$beta
 c_lasso_largeLambda$beta
 #In conclusion, we pick the following 5 predictors:
   #Private/S.F.Ratio/PhD/perc.alumni/Grad.Rate
-c_test_q4_selected<-data.frame(Outstate=c_test_q4$Outstate,Private=c_test_q4$Private,S.F.Ratio=c_test_q4$S.F.Ratio,PhD=c_test_q4$PhD,perc.alumni=c_test_q4$perc.alumni,Grad.Rate=c_test_q4$Grad.Rate)
-c_train_q4_selected<-data.frame(Outstate=c_train_q4$Outstate,Private=c_train_q4$Private,S.F.Ratio=c_train_q4$S.F.Ratio,PhD=c_train_q4$PhD,perc.alumni=c_train_q4$perc.alumni,Grad.Rate=c_train_q4$Grad.Rate)
+c_test_q4_selected<-data.frame(Outstate=c_test_q4$Outstate,
+                               Private=c_test_q4$Private,
+                               S.F.Ratio=c_test_q4$S.F.Ratio,
+                               PhD=c_test_q4$PhD,
+                               perc.alumni=c_test_q4$perc.alumni,
+                               Grad.Rate=c_test_q4$Grad.Rate)
+c_train_q4_selected<-data.frame(Outstate=c_train_q4$Outstate,
+                                Private=c_train_q4$Private,
+                                S.F.Ratio=c_train_q4$S.F.Ratio,
+                                PhD=c_train_q4$PhD,
+                                perc.alumni=c_train_q4$perc.alumni,
+                                Grad.Rate=c_train_q4$Grad.Rate)
 ```
 
 Using the selected variables, estimate a GAM model that best predicts log out of state tuition.  Try different combinations of linear terms, spline terms, and thin-plate/tensor spline terms to try to minimize the GCV associated with your GAM.  Most implementations will return this as part of the model object.
@@ -637,7 +648,8 @@ Using the selected variables, estimate a GAM model that best predicts log out of
 ```{r}
 #try to build model with GAM
 # if we include all variables in smooth, the model and gcv is:
-fullGam<-gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate),data=c_train_q4_selected,family = gaussian())
+fullGam<-gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + 
+               s(Grad.Rate),data=c_train_q4_selected,family = gaussian())
 fullGamGcv<-fullGam$gcv.ubre.dev
 print("The gcv for optimal model is")
 fullGamGcv
@@ -752,11 +764,13 @@ Finally, let's compare both models to see which one performs best on the out of 
 ```{r}
 #GAM model:optGAMModel
 GamPredmodel<-gam(Outstate ~ Private+s(S.F.Ratio) + s(PhD) + s(perc.alumni) + s(Grad.Rate)+s(Grad.Rate,PhD),data=c_train_q4_selected,family = gaussian())
-newd<-data.frame(Private=c_train_q4$Private,S.F.Ratio=c_train_q4$S.F.Ratio,PhD=c_train_q4$PhD,perc.alumni=c_train_q4$perc.alumni,Grad.Rate=c_train_q4$Grad.Rate)
-mse_GAM<-mse(c_test_q4_selected$Outstate,predict.gam(GamPredmodel,newd))
+
+mse_GAM<-mse(c_test_q4_selected$Outstate,predict.gam(GamPredmodel,c_test_q4))
+
 #LASaO model: c_lasso_optimal
 lasso_predictor <- data.matrix(c_test_q4[,-9])
 mse_Lasoo<-mse(c_test_q4$Outstate,predict(c_lasso_optimal,newx=lasso_predictor))
+
 p4p4_mseOutput<-data.frame(GAM_mse=mse_GAM,Lasoo_mse=mse_Lasoo)
 p4p4_mseOutput
 #If we take mse data below as reference, Lasso performs better than our GAM model.
