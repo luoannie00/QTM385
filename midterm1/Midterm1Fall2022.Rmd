@@ -26,6 +26,7 @@ library(Metrics)
 library(tidyverse)
 library(glmnet)
 library(FNN)
+library(mgcv)
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
 
@@ -129,19 +130,23 @@ Which number of features considered for each bootstrap tree yields the lowest OO
 What does this say about the bias/variance tradeoff for this specific data set?  Does out-of-sample predictive accuracy favor higher variance among trees or lower bias in the estimates?
 
 ```{r}
+#question - is it okay to further downsize the training set??? yess
+#question - drop url??? yess
+```
+
+```{r}
 #sample training dataset
-#question - do we need to set seed for every chunk of code???
 set.seed(123)
-strain_df <- train_df[sample(x=nrow(train_df), size=7500, replace=FALSE),]
-stest_df <- train_df[sample(x=nrow(train_df), size=2500, replace=FALSE),]
+strain_df_p1 <- train_df[sample(x=nrow(train_df), size=7500, replace=FALSE),]
+stest_df_p1 <- train_df[sample(x=nrow(train_df), size=2500, replace=FALSE),]
 
 #transform variable shares
-strain_df$shares <- log(strain_df$shares)
-stest_df$shares <- log(stest_df$shares)
+strain_df_p1$shares <- log(strain_df_p1$shares)
+stest_df_p1$shares <- log(stest_df_p1$shares)
 
 #drop variable url
-strain_df <- strain_df[,-1]
-stest_df <- stest_df[,-1]
+strain_df_p1 <- strain_df_p1[,-1]
+stest_df_p1 <- stest_df_p1[,-1]
 ```
 
 ```{r}
@@ -150,11 +155,11 @@ oob <- c()
 rf_mse <- c()
 
 for (i in mtry) {
-  p1p1_m <- ranger(data=strain_df, formula = shares~., mtry=i, num.trees=1000)
+  p1p1_m <- ranger(data=strain_df_p1, formula = shares~., mtry=i, num.trees=1000)
   
   oob <- c(oob,p1p1_m$prediction.error)
-  p1p1_pred <- predict(p1p1_m, data=stest_df)
-  rf_mse <- c(rf_mse,mse(stest_df$shares, p1p1_pred$predictions))
+  p1p1_pred <- predict(p1p1_m, data=stest_df_p1)
+  rf_mse <- c(rf_mse,mse(stest_df_p1$shares, p1p1_pred$predictions))
 }
 ```
 
@@ -172,7 +177,7 @@ ggplot(data=p1p1_df) +
   theme_bw()
 ```
 
-The number of features considered for each bootstrap tree that yields the lowest OOB error is 8, whereas the number of features that yields the lowest error on the heldout test set is 20.
+The number of features considered for each bootstrap tree that yields the lowest OOB error is 8, whereas the number of features that yields the lowest error on the heldout test set is 20. However, in terms of mse on the heldout test set, there's no significant decrease beyond when the number of features goes above 8. Therefore, we conclude that 8 is a good choice.
 
 
 ### Part 2
@@ -184,7 +189,7 @@ Explore the relationship between the two most important predictors and the log n
 *Hint*: Try to see how these two variables and the true number of shares move together.  Then, do the same for the values of these variables and the corresponding predictions.  It probably isn't super clear, but you can likely see a bit of a trend.
 
 ```{r}
-p1p2_m <- ranger(data=strain_df, formula = shares~., mtry=8, num.trees=1000, 
+p1p2_m <- ranger(data=strain_df_p1, formula = shares~., mtry=8, num.trees=1000, 
                  importance='permutation')
 
 p1p2_df <- data.frame(p1p2_m$variable.importance)
@@ -201,17 +206,17 @@ ggplot(data=p1p2_df, aes(x=var, y=var_imp)) +
 p1p2_df %>% arrange(desc(var_imp)) %>% head(2)
 
 #true relationships
-ggplot(data=strain_df) +
+ggplot(data=strain_df_p1) +
   geom_point(aes(x=kw_avg_avg, y=shares)) +
   theme_bw()
 
-ggplot(data=strain_df) +
+ggplot(data=strain_df_p1) +
   geom_point(aes(x=kw_max_avg, y=shares))+
   theme_bw()
 
 #prediction relationships
-pred_r <- data.frame(kw_avg_avg = strain_df$kw_avg_avg, 
-                     kw_max_avg = strain_df$kw_max_avg,
+pred_r <- data.frame(kw_avg_avg = strain_df_p1$kw_avg_avg, 
+                     kw_max_avg = strain_df_p1$kw_max_avg,
                      pred_shares = p1p2_m$predictions)
 
 ggplot(data=pred_r) +
@@ -239,19 +244,52 @@ For any method that you seriously consider as a candidate for producing the best
 Once you decide on a final model, use the data included in `midterm_test.csv` to produce a set of predictions for the test data.  These predictions should be exported as a .csv file with two columns - `ID` of the observation and the `prediction` produced by your model.  Please be sure to include a code block that demonstrates your method for doing this in your final submission.  Your predictions should be saved as "Midterm1Q1_Predictions.csv" and submitted along with your final solutions.
 
 ```{r}
-#question - url???
-#warning comes from the collinearity problem
-#question - how to solve???
-simple_lm <- lm(data=strain_df, formula = shares ~ .)
-#in sample mse
-mse(unname(predict(simple_lm, newdata=strain_df)), strain_df$shares)
-#out of sample mse
-mse(unname(predict(simple_lm, newdata=stest_df)), stest_df$shares)
+#question - how to solve the collinearity problem??? do not use gam or subset selection
+#question - does GAM model have collinearity problem??? yess
+#question - how to find the optimal GAM model??? nooo
 ```
 
 ```{r}
-p2_x <- data.matrix(strain_df[,-60])
-p2_y <- data.matrix(strain_df[,60])
+#sample training dataset
+set.seed(123)
+sam_train <- as.numeric(sample(x=nrow(train_df), size=30000, replace=FALSE))
+sam_test <- setdiff(seq(1,35000,1), sam)
+strain_df_p2 <- train_df[sam_train,]
+stest_df_p2 <- train_df[sam_test,]
+
+#transform variable shares
+strain_df_p2$shares <- log(strain_df_p2$shares)
+stest_df_p2$shares <- log(stest_df_p2$shares)
+
+#drop variable url
+strain_df_p2 <- strain_df_p2[,-1]
+stest_df_p2 <- stest_df_p2[,-1]
+```
+
+```{r}
+#According to problem 1, we take for granted that 8 is a good choice for the number of variables considered for each bootstrap tree in the random forest model in terms of OOB error and MSE on the heldout data set.
+p2_rf_m <- ranger(data=strain_df_p2, formula = shares~., mtry=8, num.trees=1000)
+#OOB error
+p2_rf_m$prediction.error
+#out of sample mse
+mse(predict(p2_rf_m, data=stest_df_p2)$predictions, stest_df_p2$shares)
+```
+
+```{r}
+#According to problem 1 part 2, we can choose a subset of important variables to fit a GAM model.
+p1p2_df %>% arrange(desc(var_imp))
+p2_gam <- gam(data=strain_df_p2, family=gaussian(), 
+              shares ~ s(kw_avg_avg)+s(kw_max_avg)+s(self_reference_avg_sharess))
+#in sample mse
+mse(predict.gam(p2_gam, strain_df_p2), strain_df_p2$shares)
+#out of sample mse
+mse(predict.gam(p2_gam, stest_df_p2), stest_df_p2$shares)
+```
+
+```{r}
+p2_x <- data.matrix(strain_df_p2[,-60])
+p2_y <- data.matrix(strain_df_p2[,60])
+
 p2_cv_lassom <- cv.glmnet(x=p2_x, y=p2_y, family="gaussian", alpha=1, nfolds=10,
                           type.measure="mse")
 plot(p2_cv_lassom)
@@ -261,16 +299,29 @@ p2_optimal_lassom <- glmnet(x=p2_x, y=p2_y, family="gaussian", alpha=1,
 #in sample mse
 mse(p2_y, predict(p2_optimal_lassom, newx=p2_x))
 #out of sample mse
-mse(stest_df$shares, predict(p2_optimal_lassom, newx=data.matrix(stest_df[,-60])))
+mse(stest_df_p2$shares, predict(p2_optimal_lassom, newx=data.matrix(stest_df_p2[,-60])))
 ```
 
 ```{r}
-knn <- c(5,10,15,20,25,30,35,40,45,50)
+p2_cv_ridgem <- cv.glmnet(x=p2_x, y=p2_y, family="gaussian", alpha=0, nfolds=10,
+                          type.measure="mse")
+plot(p2_cv_ridgem)
+print(p2_cv_ridgem)
+p2_optimal_ridgem <- glmnet(x=p2_x, y=p2_y, family="gaussian", alpha=0,
+                            lambda=p2_cv_ridgem$lambda.min)
+#in sample mse
+mse(p2_y, predict(p2_optimal_ridgem, newx=p2_x))
+#out of sample mse
+mse(stest_df_p2$shares, predict(p2_optimal_ridgem, newx=data.matrix(stest_df_p2[,-60])))
+```
+
+```{r}
+knn <- seq(5,1000,100)
 knn_mse_out <- c()
 
 for (i in knn) {
-  knn_m <- knn.reg(train=p2_x, test=stest_df[,-60], y=p2_y, k=i)
-  knn_mse_out <- c(knn_mse_out,mse(knn_m$pred, stest_df$shares))
+  knn_m <- knn.reg(train=p2_x, test=stest_df_p2[,-60], y=p2_y, k=i)
+  knn_mse_out <- c(knn_mse_out,mse(knn_m$pred, stest_df_p2$shares))
 }
 
 p2_knn_df <- data.frame(knn,knn_mse_out)
@@ -279,6 +330,24 @@ ggplot(data=p2_knn_df) +
   geom_line(aes(x=knn, y=knn_mse_out)) +
   theme_bw()
 ```
+
+```{r}
+#conclusion
+p2_mse_in_sample <- c(mse(predict.gam(p2_gam, strain_df_p2), strain_df_p2$shares),
+                      mse(p2_y, predict(p2_optimal_lassom, newx=p2_x)),
+                      mse(p2_y, predict(p2_optimal_ridgem, newx=p2_x)))
+p2_mse_out_sample <- c(mse(predict.gam(p2_gam, stest_df_p2), stest_df_p2$shares),
+                       mse(stest_df_p2$shares, predict(p2_optimal_lassom, 
+                                                       newx=data.matrix(stest_df_p2[,-60]))),
+                       mse(stest_df_p2$shares, predict(p2_optimal_ridgem, 
+                                                       newx=data.matrix(stest_df_p2[,-60]))))
+p2_m <- c('GAM','RIDGE','LASSO')
+data.frame(model = p2_m,
+           mse_in_sample = p2_mse_in_sample,
+           mse_out_sample = p2_mse_out_sample)
+```
+
+In addition, the lowest out of sample mse in the knn model is 0.79 when k equals around 100. But the random forest model clearly outperforms all four, with an OOB error of 0.7239764 and out of sample mse of 0.6875225. Hence, the random forest model with the number of variables considered for each bootstrap tree of 8 is our optimal model.
 
   
 ## Question 3 - Interpreting Your Big Predictive Model (7 pts.)
