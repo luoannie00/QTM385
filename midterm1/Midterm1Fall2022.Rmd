@@ -24,6 +24,8 @@ library(data.table)
 library(ranger)
 library(Metrics)
 library(tidyverse)
+library(glmnet)
+library(FNN)
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
 
@@ -136,28 +138,32 @@ stest_df <- train_df[sample(x=nrow(train_df), size=2500, replace=FALSE),]
 #transform variable shares
 strain_df$shares <- log(strain_df$shares)
 stest_df$shares <- log(stest_df$shares)
+
+#drop variable url
+strain_df <- strain_df[,-1]
+stest_df <- stest_df[,-1]
 ```
 
 ```{r}
 mtry <- c(2,4,6,8,10,20,30,40,50,59)
 oob <- c()
-mse <- c()
+rf_mse <- c()
 
 for (i in mtry) {
   p1p1_m <- ranger(data=strain_df, formula = shares~., mtry=i, num.trees=1000)
   
   oob <- c(oob,p1p1_m$prediction.error)
   p1p1_pred <- predict(p1p1_m, data=stest_df)
-  mse <- c(mse,mse(stest_df$shares, p1p1_pred$predictions))
+  rf_mse <- c(rf_mse,mse(stest_df$shares, p1p1_pred$predictions))
 }
 ```
 
 ```{r}
-p1p1_df <- data.frame(mtry,oob,mse)
+p1p1_df <- data.frame(mtry,oob,rf_mse)
 
 ggplot(data=p1p1_df) +
-  geom_point(aes(x=mtry, y=mse)) +
-  geom_line(aes(x=mtry, y=mse)) +
+  geom_point(aes(x=mtry, y=rf_mse)) +
+  geom_line(aes(x=mtry, y=rf_mse)) +
   theme_bw()
 
 ggplot(data=p1p1_df) +
@@ -166,7 +172,7 @@ ggplot(data=p1p1_df) +
   theme_bw()
 ```
 
-The number of features considered for each bootstrap tree that yields the lowest OOB error as well as the lowest error on the heldout test set is 8.
+The number of features considered for each bootstrap tree that yields the lowest OOB error is 8, whereas the number of features that yields the lowest error on the heldout test set is 20.
 
 
 ### Part 2
@@ -231,6 +237,49 @@ For any method that you seriously consider as a candidate for producing the best
   3. The time (in seconds) required for you to tune the model and run it on the full training data **together**.  This time should include the computational time needed to choose the values of any hyperparameters and run the model of the full training data to get a prediction method for unseen data.  There are many different ways to interpret and accomplish this task, but there is a general trend that you should see when training your models. 
 
 Once you decide on a final model, use the data included in `midterm_test.csv` to produce a set of predictions for the test data.  These predictions should be exported as a .csv file with two columns - `ID` of the observation and the `prediction` produced by your model.  Please be sure to include a code block that demonstrates your method for doing this in your final submission.  Your predictions should be saved as "Midterm1Q1_Predictions.csv" and submitted along with your final solutions.
+
+```{r}
+#question - url???
+#warning comes from the collinearity problem
+#question - how to solve???
+simple_lm <- lm(data=strain_df, formula = shares ~ .)
+#in sample mse
+mse(unname(predict(simple_lm, newdata=strain_df)), strain_df$shares)
+#out of sample mse
+mse(unname(predict(simple_lm, newdata=stest_df)), stest_df$shares)
+```
+
+```{r}
+p2_x <- data.matrix(strain_df[,-60])
+p2_y <- data.matrix(strain_df[,60])
+p2_cv_lassom <- cv.glmnet(x=p2_x, y=p2_y, family="gaussian", alpha=1, nfolds=10,
+                          type.measure="mse")
+plot(p2_cv_lassom)
+print(p2_cv_lassom)
+p2_optimal_lassom <- glmnet(x=p2_x, y=p2_y, family="gaussian", alpha=1,
+                            lambda=p2_cv_lassom$lambda.min)
+#in sample mse
+mse(p2_y, predict(p2_optimal_lassom, newx=p2_x))
+#out of sample mse
+mse(stest_df$shares, predict(p2_optimal_lassom, newx=data.matrix(stest_df[,-60])))
+```
+
+```{r}
+knn <- c(5,10,15,20,25,30,35,40,45,50)
+knn_mse_out <- c()
+
+for (i in knn) {
+  knn_m <- knn.reg(train=p2_x, test=stest_df[,-60], y=p2_y, k=i)
+  knn_mse_out <- c(knn_mse_out,mse(knn_m$pred, stest_df$shares))
+}
+
+p2_knn_df <- data.frame(knn,knn_mse_out)
+ggplot(data=p2_knn_df) +
+  geom_point(aes(x=knn, y=knn_mse_out)) +
+  geom_line(aes(x=knn, y=knn_mse_out)) +
+  theme_bw()
+```
+
   
 ## Question 3 - Interpreting Your Big Predictive Model (7 pts.)
 
