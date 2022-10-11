@@ -179,6 +179,8 @@ ggplot(data=p1p1_df) +
 
 The number of features considered for each bootstrap tree that yields the lowest OOB error is 8, whereas the number of features that yields the lowest error on the heldout test set is 20. However, in terms of mse on the heldout test set, there's no significant decrease beyond when the number of features goes above 8. Therefore, we conclude that 8 is a good choice.
 
+In addition, the specific dataset implies that we have more decrease in variance among trees than increase in estimates bias when mtry is smaller than 8, whereas the increase in estimates bias is equal to the decrease in tree variance when mtry goes beyond 8. Therefore, the out of sample mse drops most significantly until mtry hits 8, which is our optimal choice for mtry.
+
 
 ### Part 2
 
@@ -355,6 +357,25 @@ In addition, the lowest out of sample mse in the knn model is 0.79 when k equals
 Using your predictive model from question 1, explain how the predictions change as a  function of your predictors.  Specifically, try to figure out an interpretable set of conditions under which we would expect that an article is shared a lot and when we would expect it to be shared infrequently.  This is a high dimensional predictor space, so you won't be able to do this exactly, but do your best to come up with some general observations that dictate the predicted shares for an article.
 
 *Hint*: I'm guessing that the method you choose in Q1 will not yield a particularly predictable prediction function.  Just do your best to try to make some general conclusions.  The goal of this question is to get you thinking about the difference between a good predictive model and an interpretable one!
+
+```{r}
+p3_m <- ranger(data=strain_df_p2, formula = shares~., mtry=8, num.trees=1000,
+               importance='permutation')
+
+p3_df <- data.frame(p3_m$variable.importance)
+p3_df$var <- rownames(p3_df)
+p3_df <- p3_df %>% rename(var_imp = p3_m.variable.importance)
+
+ggplot(data=p3_df, aes(x=var, y=var_imp)) +
+  geom_bar(stat='identity', width=0.75) + coord_flip() +
+  labs(x="Features", y="Variable Importance") +
+  theme_bw()
+
+p3_df %>% arrange(desc(var_imp))
+```
+
+According to the variance importance plot from above based on our optimal random forest model from problem 2 trained on a dataset of 30000 observations with the mtry value of 8, some of the most important predictors that dictate the predicted shares of an article are kw_avg_avg, kw_max_avg, self_reference_avg_sharess, kw_min_avg, LDA_02, and timedelta. Articles that are high in those features are likely to be shared more often than those that are not. However, since the random forest model is a good predictive model but not known as a good interpretable model, the important variable plot above may not be very accurate.
+
 
 ## Question 4 - Building a Predictive Model with a Subset of Predictors (25 pts.)
 
