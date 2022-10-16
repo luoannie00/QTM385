@@ -374,7 +374,7 @@ ggplot(data=p3_df, aes(x=var, y=var_imp)) +
 p3_df %>% arrange(desc(var_imp))
 ```
 
-According to the variance importance plot from above based on our optimal random forest model from problem 2 trained on a dataset of 30000 observations with the mtry value of 8, some of the most important predictors that dictate the predicted shares of an article are kw_avg_avg, kw_max_avg, self_reference_avg_sharess, kw_min_avg, LDA_02, and timedelta. Articles that are high in those features are likely to be shared more often than those that are not. However, since the random forest model is a good predictive model but not known as a good interpretable model, the important variable plot above may not be very accurate.
+According to the variable importance plot from above based on our optimal random forest model from problem 2 trained on a dataset of 30000 observations with the mtry value of 8, some of the most important predictors that dictate the predicted shares of an article are kw_avg_avg, kw_max_avg, self_reference_avg_sharess, kw_min_avg, LDA_02, and timedelta. Articles that are high in those features are likely to be shared more often than those that are not. However, since the random forest model is a good predictive model but not known as a good interpretable model, the important variable plot above may not be very accurate.
 
 
 ## Question 4 - Building a Predictive Model with a Subset of Predictors (25 pts.)
