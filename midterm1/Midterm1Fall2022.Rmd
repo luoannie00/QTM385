@@ -31,7 +31,8 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 1
 ```
 
 ```{r}
-setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/midterm1')
+#setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/midterm1')
+setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/midterm1')
 train_df <- read.csv('midterm1_train.csv')
 test_df <- read.csv('midterm1_testNoShares.csv')
 ```
@@ -205,7 +206,8 @@ ggplot(data=p1p2_df, aes(x=var, y=var_imp)) +
 ```
 
 ```{r}
-p1p2_df %>% arrange(desc(var_imp)) %>% head(2)
+p1p2_df %>% arrange(desc(var_imp)) %>% head(2) #most important
+p1p2_df %>% arrange(desc(var_imp)) %>% tail(1) #least important
 
 #true relationships
 ggplot(data=strain_df_p1) +
@@ -255,7 +257,7 @@ Once you decide on a final model, use the data included in `midterm_test.csv` to
 #sample training dataset
 set.seed(123)
 sam_train <- as.numeric(sample(x=nrow(train_df), size=30000, replace=FALSE))
-sam_test <- setdiff(seq(1,35000,1), sam)
+sam_test <- setdiff(seq(1,35000,1), sam_train)
 strain_df_p2 <- train_df[sam_train,]
 stest_df_p2 <- train_df[sam_test,]
 
@@ -409,7 +411,122 @@ The difference between this question and the previous two questions is that ther
 In your final deliverable, explain your process of choosing a model that is appropriate for modeling univariate relationships and demonstrate the process that you used to choose which predictor was the best.  Be sure to engage with different EPE measures.
 
 Once you decide on a final model, use the data included in `midterm_test.csv` to produce a set of predictions for the test data.  These predictions should be exported as a .csv file with two columns - `ID` of the observation and the `prediction` produced by your model.  Please be sure to include a code block that demonstrates your method for doing this in your final submission.  Your predictions should be saved as "Midterm1Q5_Predictions.csv" and submitted along with your final solutions.
-  
+
+Initial sampling and manipulation
+```{r}
+#sample training dataset
+set.seed(456)
+sam6_train <- as.numeric(sample(x=nrow(train_df), size=30000, replace=FALSE))
+sam6_test <- setdiff(seq(1,35000,1), sam6_train)
+strain_df_p6 <- train_df[sam6_train,]
+stest_df_p6 <- train_df[sam6_test,]
+
+#transform variable shares
+strain_df_p6$shares <- log(strain_df_p6$shares)
+stest_df_p6$shares <- log(stest_df_p6$shares)
+
+#drop variable url
+strain_df_p6 <- strain_df_p6[,-1]
+stest_df_p6 <- stest_df_p6[,-1]
+```
+
+We start by getting some sense on what might be a good choice of the uni-variable. From the full model, we see that, conditional on mtry being 8, the variables that seem most important are "kw_avg_avg" and "kw_max_avg." However, from the plot of shares vs "kw_avg_avg" and vs "kw_max_avg," we saw a big blob of data points that seem hard to be captured by OLS or polynomial expansion of a single variable. Also, since OLS is dominated by ridge and lasso, we will not use OLS or polynomial expansion. We also won't use GAM since GAM with one "s(variable)" term is just univariate spline. Consequently, we will use a for-loop to iterate all 59 variables on all possible models we learned--KNN, ridge, lasso, spline, LOESS, RF with mtry = 1, and compute and compare in-sample and out-of-sample EPE to pick out best model and best variable.
+
+KNN
+```{r}
+#out-of-sample
+knn_p6_mse_out <- c()
+#k = 1 since only 1 variable
+#test for all 59 variables
+for (j in 1:59) {
+  knn_p6_m <- knn.reg(train=as.data.frame(strain_df_p6[,j]), test=as.data.frame(stest_df_p6[,j]), y=as.data.frame(strain_df_p6[,60]), k=1)
+  knn_p6_mse_out <- c(knn_p6_mse_out,mse(knn_p6_m$pred, stest_df_p6$shares))
+}
+p6_knn_out_df <- data.frame(var = colnames(strain_df_p6[,-60]), knn_p6_mse_out)
+p6_knn_out_df %>% arrange(knn_p6_mse_out) #weekday_is_wednesday; data_channel_is_world is 13th
+
+#in-sample using KCV
+knn_reg_kfold <- function(x, y, k, folds, seed){
+  set.seed(seed)
+  #sample
+  sam6_KNN_kfold_train <- as.numeric(sample(nrow(as.data.frame(x)), size=ceiling(nrow(as.data.frame(x))/folds), replace=FALSE))
+  sam6_KNN_kfold_test <- setdiff(seq(1,30000,1), sam6_KNN_kfold_train)
+  #model for prediction error
+  p6_p <- c()
+  for (i in 1:folds){
+    x_train <- x[sam6_KNN_kfold_train]
+    x_test <- x[sam6_KNN_kfold_test]
+    y_train <- y[sam6_KNN_kfold_train]
+    y_test <- y[sam6_KNN_kfold_test]
+    p6_KNN_kfoldm <- knn.reg(train = as.data.frame(x_train), test = as.data.frame(x_test), y = as.data.frame(y_train), k = k)
+    p6_p[i] <- mse(p6_KNN_kfoldm$pred, as.numeric(unlist(y_test)))
+  }
+  return(p6_p[1]/folds)
+}
+p6_kfold_5 <- c()
+p6_kfold_10 <- c()
+for (j in 1:59) {
+  p6_kfold_5[j] <- knn_reg_kfold(strain_df_p6[,j], strain_df_p6[,60], 1, 5, 456)
+  p6_kfold_10[j] <- knn_reg_kfold(strain_df_p6[,j], strain_df_p6[,60], 1, 10, 456)
+}
+p6_knn_in_df <- data.frame(var = colnames(strain_df_p6[,-60]), p6_kfold_5, p6_kfold_10)
+p6_knn_in_df %>% arrange(p6_kfold_5) #data_channel_is_world, 5fold cv; weekday_is_wednesday is 3rd
+p6_knn_in_df %>% arrange(p6_kfold_10) #data_channel_is_world, 10fold cv; weekday_is_wednesday is 6th
+```
+
+Ridge and LASSO
+```{r}
+p6_x <- data.matrix(strain_df_p6[,-60]) #pool of 59 potential variables
+p6_y <- data.matrix(strain_df_p6[,60])
+
+#ridge
+p6_ridge_in <- c()
+p6_ridge_out <- c()
+test <- cv.glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=0, nfolds=10,
+                          type.measure="mse")
+test2 <- glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=0, nfolds=10,
+                          lambda=test$lambda)
+
+cf1 <- c()
+cf2 <- c()
+for (i in 1:37) {
+  cf1 <- append(cf1, rownames(test2$beta)[i])
+  cf2 <- append(cf2, unname(test2$beta)[i])
+}
+cf <- data.frame(cf1, cf2)
+
+ggplot(data=cf, aes(x=cf1, y=cf2)) +
+  geom_bar(stat="identity", width=0.75) + coord_flip() +
+  labs(x="Features", y="Coefficient Estimate") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.title.x = element_text(face="bold", colour="red", size = 12),
+        axis.title.y = element_text(face="bold", colour="red", size = 12))
+
+for (i in 1:59){
+  p6_cv_ridgem <- cv.glmnet(x=p6_x[,i], y=p6_y, family="gaussian", alpha=0, nfolds=10,
+                          type.measure="mse")
+  p6_optimal_ridgem <- glmnet(x=p6_x[,i], y=p6_y, family="gaussian", alpha=0,
+                            lambda=p6_cv_ridgem$lambda.min)
+  #in sample mse
+  p6_ridge_in <- data.frame(p6_ridge_in, mse(p6_y, predict(p6_optimal_ridgem, newx=p6_x[,i])))
+  #out of sample mse
+  p6_ridge_out <- data.frame(p6_ridge_out, mse(stest_df_p6$shares, predict(p6_optimal_ridgem, newx=data.matrix(stest_df_p6[,i]))))
+}
+
+#LASSO
+p2_cv_lassom <- cv.glmnet(x=p2_x, y=p2_y, family="gaussian", alpha=1, nfolds=10,
+                          type.measure="mse")
+plot(p2_cv_lassom)
+print(p2_cv_lassom)
+p2_optimal_lassom <- glmnet(x=p2_x, y=p2_y, family="gaussian", alpha=1,
+                            lambda=p2_cv_lassom$lambda.min)
+#in sample mse
+mse(p2_y, predict(p2_optimal_lassom, newx=p2_x))
+#out of sample mse
+mse(stest_df_p2$shares, predict(p2_optimal_lassom, newx=data.matrix(stest_df_p2[,-60])))
+```
+
 ## Question 7 - Do your models perform well on out-of-sample data? (10 pts.)
 
 For each model, I'll compute a root mean squared prediction error using your submitted predictions and the true log number of shares for the articles in the hidden test set.  Across all models turned in, points will be allocated as follows:
