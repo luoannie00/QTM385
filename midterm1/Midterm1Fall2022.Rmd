@@ -957,31 +957,25 @@ for (i in index_nb){
 ### Random Forest
 ```{r}
 # pick best variable
-# RF model with 4 variables & 5 variables
-RF_model_1 <- ranger(data=train_df_q4, formula = shares~., mtry=4, num.trees=1000,importance='permutation')
-RF_model_5 <- ranger(data=train_df_q4, formula = shares~., mtry=5, num.trees=1000,importance='permutation')
-# find the top-importance variables for each model
-# we won't worry about the negative importance here as they're all generally small
-varImportance4 <- data.frame(var_importance=RF_model_4$variable.importance)
-arrange(varImportance4, desc(var_importance))
-varImportance5 <- data.frame(var_importance=RF_model_5$variable.importance)
-arrange(varImportance5, desc(var_importance))
+RF_model_1 <- ranger(data=strain_df_p6, formula = shares~., mtry=1, num.trees=1000,importance='permutation')
+varImportance1 <- data.frame(var_importance=RF_model_1$variable.importance)
+arrange(varImportance1, desc(var_importance)) #most important variable is kw_avg_avg
 
-
-
-
-
-RFmodel_p6<-ranger(data=strain_df_p6, formula = shares~., mtry=1, num.trees=1000)
+#RF model
+p6_rf_train <- strain_df_p6 %>% select(kw_avg_avg, shares)
+p6_rf_test <- stest_df_p6 %>% select(kw_avg_avg, shares)
+RFmodel_p6<-ranger(data=p6_rf_train, formula = shares~., mtry=1, num.trees=1000)
 # OOB
-OOB_RF4var<-RFmodel_selected_4var$prediction.error
-OOB_RF5var<-RFmodel_selected_5var$prediction.error
+OOB_p6<-RFmodel_p6$prediction.error
+OOB_p6 #in-sample EPE is 1.07784
 # out of sample MSE
-MSE_RF4var<-mse(predict(RFmodel_selected_4var, data=test_df_4RFvar)$predictions, test_df_4RFvar$shares)
-MSE_RF5var<-mse(predict(RFmodel_selected_5var, data=test_df_5RFvar)$predictions, test_df_5RFvar$shares)
-oob<-c(oob,OOB_RF4var,OOB_RF5var)
-mse<-c(mse,MSE_RF4var,MSE_RF5var)
-modelName<-c(modelName,"RF4var","RF5var")
+p6_RF_out<-mse(predict(RFmodel_p6, data=p6_rf_test)$predictions, p6_rf_test$shares)
+p6_RF_out #out-of-sample EPE is 1.089439
+p6_RF_result <- data.frame(model = "Random Forest", var = "kw_avg_avg", mse_out = p6_RF_out, mse_in = OOB_p6)
+p6_result <- rbind(p6_result, p6_RF_result)
+p6_result
 ```
+
 
 ## Question 7 - Do your models perform well on out-of-sample data? (10 pts.)
 
