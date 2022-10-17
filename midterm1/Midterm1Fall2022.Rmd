@@ -33,7 +33,7 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 1
 
 ```{r}
 #setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/midterm1')
-#setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/midterm1')
+setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/midterm1')
 train_df <- read.csv('midterm1_train.csv')
 test_df <- read.csv('midterm1_testNoShares.csv')
 ```
@@ -623,10 +623,16 @@ We start by getting some sense on what might be a good choice of the uni-variabl
 ```{r}
 #out-of-sample
 knn_p6_mse_out <- c()
-#k = 1 since only 1 variable
 #test for all 59 variables
+knn <- seq(5,1000,100)
+knn_mse_out <- c()
+knn_mse_out_k <- c()
 for (j in 1:59) {
-  knn_p6_m <- knn.reg(train=as.data.frame(strain_df_p6[,j]), test=as.data.frame(stest_df_p6[,j]), y=as.data.frame(strain_df_p6[,60]), k=1)
+  for (i in knn){ #choose k for each variable
+    knn_p6_k <- knn.reg(train=as.data.frame(strain_df_p6[,j]), test=as.data.frame(stest_df_p6[,j]), y=as.data.frame(strain_df_p6[,60]), k=i)
+    knn_mse_out_k <- c(knn_mse_out_k, mse(knn_p6_k$pred, stest_df_p6$shares))
+  }
+  knn_p6_m <- knn.reg(train=as.data.frame(strain_df_p6[,j]), test=as.data.frame(stest_df_p6[,j]), y=as.data.frame(strain_df_p6[,60]), k=which.min(knn_mse_out_k))
   knn_p6_mse_out <- c(knn_p6_mse_out,mse(knn_p6_m$pred, stest_df_p6$shares))
 }
 p6_knn_out_df <- data.frame(var = colnames(strain_df_p6[,-60]), knn_p6_mse_out)
@@ -925,7 +931,25 @@ We continue to use strain_df_p6 and stest_df_p6
 ```{r}
 p6_LOESS <- c()
 p6_LOESS_index <- c()
-for (i in 1:59){
+#test for non-binary variable
+low1 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .05)
+low2 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .5)
+low3 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .75)
+low4 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .95)
+low_nb_df <- data.frame(mse(strain_df_p6$shares, predict(low1)), mse(strain_df_p6$shares, predict(low2)), mse(strain_df_p6$shares, predict(low3)), mse(strain_df_p6$shares, predict(low4)))
+#test for binary variable
+p6_LOESS <- c()
+p6_LOESS_index <- c()
+low1 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .05)
+low2 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .5)
+low3 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .75)
+low4 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .95)
+low_b_df <- data.frame(mse(strain_df_p6$shares, predict(low1)), mse(strain_df_p6$shares, predict(low2)), mse(strain_df_p6$shares, predict(low3)), mse(strain_df_p6$shares, predict(low4)))
+#seems like LOESS doesn't work well for binary variables. therefore we exclude them
+p6_LOESS <- c()
+p6_LOESS_index <- c()
+index_nb <- c(1:4, 6:12, 19:30, 39:59)
+for (i in index_nb){
   low1 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .05)
   low2 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .5)
   low3 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .75)
@@ -934,9 +958,30 @@ for (i in 1:59){
   p6_LOESS <- c(p6_LOESS, min(low_df))
   p6_LOESS_index <- c(p6_LOESS_index, which.min(low_df))
 }
-
-
 ```
+
+### Random Forest
+```{r}
+# pick best variable
+RF_model_1 <- ranger(data=strain_df_p6, formula = shares~., mtry=1, num.trees=1000,importance='permutation')
+varImportance1 <- data.frame(var_importance=RF_model_1$variable.importance)
+arrange(varImportance1, desc(var_importance)) #most important variable is kw_avg_avg
+
+#RF model
+p6_rf_train <- strain_df_p6 %>% select(kw_avg_avg, shares)
+p6_rf_test <- stest_df_p6 %>% select(kw_avg_avg, shares)
+RFmodel_p6<-ranger(data=p6_rf_train, formula = shares~., mtry=1, num.trees=1000)
+# OOB
+OOB_p6<-RFmodel_p6$prediction.error
+OOB_p6 #in-sample EPE is 1.07784
+# out of sample MSE
+p6_RF_out<-mse(predict(RFmodel_p6, data=p6_rf_test)$predictions, p6_rf_test$shares)
+p6_RF_out #out-of-sample EPE is 1.089439
+p6_RF_result <- data.frame(model = "Random Forest", var = "kw_avg_avg", mse_out = p6_RF_out, mse_in = OOB_p6)
+p6_result <- rbind(p6_result, p6_RF_result)
+p6_result
+```
+
 
 ## Question 7 - Do your models perform well on out-of-sample data? (10 pts.)
 
