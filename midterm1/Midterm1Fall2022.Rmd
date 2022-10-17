@@ -598,7 +598,7 @@ In your final deliverable, explain your process of choosing a model that is appr
 
 Once you decide on a final model, use the data included in `midterm_test.csv` to produce a set of predictions for the test data.  These predictions should be exported as a .csv file with two columns - `ID` of the observation and the `prediction` produced by your model.  Please be sure to include a code block that demonstrates your method for doing this in your final submission.  Your predictions should be saved as "Midterm1Q5_Predictions.csv" and submitted along with your final solutions.
 
-Initial sampling and manipulation
+### Initial sampling and manipulation
 ```{r}
 #sample training dataset
 set.seed(456)
@@ -619,7 +619,7 @@ stest_df_p6 <- stest_df_p6[,-1]
 
 We start by getting some sense on what might be a good choice of the uni-variable. Since OLS is dominated by ridge and lasso, we will not use OLS. Since GAM with one "s(variable)" term is the same with spline model, we will only use the gam function. We will use a for-loop to iterate all 59 variables on the rest of possible models we learned--KNN, ridge, lasso, polynomial expansion, spline, LOESS, RF with mtry = 1, and compute and compare in-sample and out-of-sample EPE to pick out best model and best variable.
 
-KNN
+### KNN
 ```{r}
 #out-of-sample
 knn_p6_mse_out <- c()
@@ -668,7 +668,7 @@ p6_result
 ```
 We recorded the EPE of KNN model using weekday_is_wednesday above. We can see that the in-sample EPE is surprisingly good, but since its oos EPE doesn't look ideal, we will wait and see other models. For easier comparison, we only recorded 5fold CV to be out in sample mse, since it's only slightly higher than 10fold.
 
-Ridge
+### Ridge
 ```{r}
 p6_x <- data.matrix(strain_df_p6[,-60]) #pool of 59 potential variables
 p6_y <- data.matrix(strain_df_p6[,60])
@@ -752,7 +752,7 @@ ggplot(data=cf, aes(x=cf1, y=cf2)) +
 ```
 As we can see from the graph above, while we already made lambda very large, we cannot find a single variable that is significantly more important than others. This might be due to ridge's inability to shrink coefficients exactly to zero. So we move onto LASSO next without calculating EPE of ridge.
 
-LASSO
+### LASSO
 ```{r}
 #scientific lambda
 p6_cv_lasso <- cv.glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=1, nfolds=10,
@@ -832,7 +832,7 @@ ggplot(data=cf, aes(x=cf1, y=cf2)) +
 ```
 We see from crazy big lambda that, while we finally shrinks down to only one variable, its coefficient is very close to zero. So we don't expect this LASSO model with univariable "kw_avg_avg" is going to have good predictive capability. We move onto polynomial expansion without calculating EPE of LASSO.
 
-Polynomial Expansion
+### Polynomial Expansion
 We continue to use strain_df_p6 and stest_df_p6
 ```{r}
 #We choose LOOCV as there is less worry about bias and variance than other approaches and it's asymptotically unbiased for the in-sample EPE.
@@ -883,7 +883,7 @@ p6_result <- rbind(p6_result, p6_poly_result)
 p6_result
 ```
 
-Spline
+### Spline
 We continue to use strain_df_p6 and stest_df_p6
 ```{r}
 strain_df_p6 <- as.data.frame(strain_df_p6)
@@ -919,7 +919,24 @@ p6_result <- rbind(p6_result, p6_spline_result)
 p6_result
 ```
 
-Now we proceed to LOESS
+### LOESS
+Since LOESS is generally used for less than 4 variables, we can try this model for univariable.
+We continue to use strain_df_p6 and stest_df_p6
+```{r}
+p6_LOESS <- c()
+p6_LOESS_index <- c()
+for (i in 1:59){
+  low1 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .05)
+  low2 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .5)
+  low3 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .75)
+  low4 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .95)
+  low_df <- data.frame(mse(strain_df_p6$shares, predict(low1)), mse(strain_df_p6$shares, predict(low2)), mse(strain_df_p6$shares, predict(low3)), mse(strain_df_p6$shares, predict(low4)))
+  p6_LOESS <- c(p6_LOESS, min(low_df))
+  p6_LOESS_index <- c(p6_LOESS_index, which.min(low_df))
+}
+
+
+```
 
 ## Question 7 - Do your models perform well on out-of-sample data? (10 pts.)
 
