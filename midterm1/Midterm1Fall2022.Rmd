@@ -479,8 +479,10 @@ There are many confounding variables that we are unable to include in our model.
 ```{r}
 #sample training dataset
 set.seed(456)
-strain_df_p6 <- train_df[sample(x=nrow(train_df), size=7500, replace=FALSE),]
-stest_df_p6 <- train_df[sample(x=nrow(train_df), size=2500, replace=FALSE),]
+sam_train_p6 <- as.numeric(sample(x=nrow(train_df), size=30000, replace=FALSE))
+sam_test_p6 <- setdiff(seq(1,35000,1), sam_train_p6)
+strain_df_p6 <- train_df[sam_train_p6,]
+stest_df_p6 <- train_df[sam_test_p6,]
 
 #transform variable shares
 strain_df_p6$shares <- log(strain_df_p6$shares)
@@ -498,7 +500,7 @@ We start by getting some sense on what might be a good choice of the uni-variabl
 #out-of-sample
 knn_p6_mse_out <- c()
 #test for all 59 variables
-knn <- seq(5,100,5)
+knn <- seq(5,1000,50)
 for (j in 1:59) {
   knn_mse_out_k <- c()
   for (i in knn){ #choose k for each variable
@@ -509,15 +511,15 @@ for (j in 1:59) {
   knn_p6_mse_out <- c(knn_p6_mse_out,mse(knn_p6_m$pred, stest_df_p6$shares))
 }
 p6_knn_out_df <- data.frame(var = colnames(strain_df_p6[,-60]), knn_p6_mse_out)
-p6_knn_out_df %>% arrange(knn_p6_mse_out) #weekday_is_wednesday; data_channel_is_world is 13th
-# min mse is kw_max_avg
+p6_knn_out_df %>% arrange(knn_p6_mse_out)
+#most ideal variable is kw_avg_avg based on out-of-sample EPE
 
 #in-sample using KCV
 knn_reg_kfold <- function(x, y, k, folds, seed){
   set.seed(seed)
   #sample
   sam6_KNN_kfold_train <- as.numeric(sample(nrow(as.data.frame(x)), size=ceiling(nrow(as.data.frame(x))/folds), replace=FALSE))
-  sam6_KNN_kfold_test <- setdiff(seq(1,7500,1), sam6_KNN_kfold_train)
+  sam6_KNN_kfold_test <- setdiff(seq(1,30000,1), sam6_KNN_kfold_train)
   #model for prediction error
   p6_p <- c()
   for (i in 1:folds){
@@ -537,13 +539,14 @@ for (j in 1:59) {
   p6_kfold_10[j] <- knn_reg_kfold(strain_df_p6[,j], strain_df_p6[,60], 1, 10, 456)
 }
 p6_knn_in_df <- data.frame(var = colnames(strain_df_p6[,-60]), p6_kfold_5, p6_kfold_10)
-p6_knn_in_df %>% arrange(p6_kfold_5) #data_channel_is_world, 5fold cv; weekday_is_wednesday is 3rd
-p6_knn_in_df %>% arrange(p6_kfold_10) #data_channel_is_world, 10fold cv; weekday_is_wednesday is 6th
+p6_knn_in_df %>% arrange(p6_kfold_5)
+p6_knn_in_df %>% arrange(p6_kfold_10)
+
 ```
-For KNN, we found that "weekday_is_wednesday" is a good uni-predictor for out-of-sample EPE, and "data_channel_is_world" is a good uni-predictor for in-sample EPE both for 5 and 10 fold CV. Since "weekday_is_wednesday" is also a relatively good predictor for in-sample error, we will go with this predictor for KNN model. 
+For KNN, we found that "kw_avg_avg" is a good uni-predictor for out-of-sample EPE, and "data_channel_is_world" is a good uni-predictor for in-sample EPE both for 5 and 10 fold CV. Since variables picked based on in-sample and out-of-sample EPE are very different, we will go with "kw_avg_avg" as other models all agree on "kw_avg_avg" being the best univariable.
 ```{r}
-colnames(strain_df_p6) #weekday_is_wednesday is when 33rd variable
-p6_result <- data.frame(model = "KNN", var = p6_knn_out_df[33,1], mse_out = p6_knn_out_df[33,2], mse_in = p6_knn_in_df[33,2])
+colnames(strain_df_p6) #weekday_is_wednesday is when 27th variable
+p6_result <- data.frame(model = "KNN", var = p6_knn_out_df[27,1], mse_out = p6_knn_out_df[27,2], mse_in = p6_knn_in_df[27,2])
 p6_result
 ```
 We recorded the EPE of KNN model using weekday_is_wednesday above. We can see that the in-sample EPE is surprisingly good, but since its oos EPE doesn't look ideal, we will wait and see other models. For easier comparison, we only recorded 5fold CV to be out in sample mse, since it's only slightly higher than 10fold.
@@ -806,19 +809,17 @@ We continue to use strain_df_p6 and stest_df_p6
 p6_LOESS <- c()
 p6_LOESS_index <- c()
 #test for non-binary variable
-low1 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .05)
-low2 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .5)
-low3 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .75)
-low4 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .95)
-low_nb_df <- data.frame(mse(strain_df_p6$shares, predict(low1)), mse(strain_df_p6$shares, predict(low2)), mse(strain_df_p6$shares, predict(low3)), mse(strain_df_p6$shares, predict(low4)))
+low1 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .55)
+low2 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .75)
+low3 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .95)
+low_nb_df <- data.frame(mse(strain_df_p6$shares, predict(low1)), mse(strain_df_p6$shares, predict(low2)), mse(strain_df_p6$shares, predict(low3)))
 #test for binary variable
 p6_LOESS <- c()
 p6_LOESS_index <- c()
-low1 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .05)
-low2 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .5)
-low3 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .75)
-low4 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .95)
-low_b_df <- data.frame(mse(strain_df_p6$shares, predict(low1)), mse(strain_df_p6$shares, predict(low2)), mse(strain_df_p6$shares, predict(low3)), mse(strain_df_p6$shares, predict(low4)))
+low1 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .55)
+low2 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .75)
+low3 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .95)
+low_b_df <- data.frame(mse(strain_df_p6$shares, predict(low1)), mse(strain_df_p6$shares, predict(low2)), mse(strain_df_p6$shares, predict(low3)))
 #seems like LOESS doesn't work well for binary variables. therefore we exclude them
 p6_LOESS <- c()
 p6_LOESS_index <- c()
