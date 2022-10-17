@@ -33,7 +33,7 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 1
 
 ```{r}
 #setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/midterm1')
-setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/midterm1')
+#setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/midterm1')
 train_df <- read.csv('midterm1_train.csv')
 test_df <- read.csv('midterm1_testNoShares.csv')
 ```
@@ -602,11 +602,8 @@ Once you decide on a final model, use the data included in `midterm_test.csv` to
 ```{r}
 #sample training dataset
 set.seed(456)
-sam6_train <- as.numeric(sample(x=nrow(train_df), size=30000, replace=FALSE))
-sam6_test <- setdiff(seq(1,35000,1), sam6_train)
-strain_df_p6 <- train_df[sam6_train,]
-stest_df_p6 <- train_df[sam6_test,]
-rm(train_df)
+strain_df_p6 <- train_df[sample(x=nrow(train_df), size=7500, replace=FALSE),]
+stest_df_p6 <- train_df[sample(x=nrow(train_df), size=2500, replace=FALSE),]
 
 #transform variable shares
 strain_df_p6$shares <- log(strain_df_p6$shares)
