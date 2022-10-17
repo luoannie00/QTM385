@@ -33,7 +33,7 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 1
 
 ```{r}
 #setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/midterm1')
-setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/midterm1')
+#setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/midterm1')
 train_df <- read.csv('midterm1_train.csv')
 test_df <- read.csv('midterm1_testNoShares.csv')
 ```
@@ -381,27 +381,213 @@ According to the variable importance plot from above based on our optimal random
 
 
 ## Question 4 - Building a Predictive Model with a Subset of Predictors (25 pts.)
+## Question 4 - Building a Predictive Model with a Subset of Predictors (25 pts.)
+### Demonstration of our method for question 4 optimal model
+```{r}
+# There are mainly two parts in the work for question4: variable selection and model selection. In variable selection, we will use LASSO and random forest to have some potential optimal-subset of variables. Then, we will use splines plot from the GAM function to have a general pictures of the relations between each variable and the log(share).Once we narrow down on 1/2 potential subset of variable, we will move on to the model selection part. We some analysis on what we got in the variable selection and previous work, we decide to apply non-linear model KNN and random forest to the subset of variables. With mse from each potential model, we will finalize the best model and make prediction on test data.
+```
 
-Though most of the model fitting methods we've discussed in class are interpretable in the sense that we can directly see how each predictor contributes to the overall prediction, it is difficult to parse through all of the predictors to derive a coherent set of rules that dictates the predictions.  The original purpose of this data set was to show that an automated content analysis system (called the Intelligent Decision Support System by the authors) could be used to improve the "shareability" of articles - translating predictions to actionable directions for maximizing profit.  While not as robust as causal analyses, predictive models do provide a method for understanding **associations** in high dimensional data and can be used to think about potential changes that lead to different predictions.  You'll discuss the caveats of this method in the next question.
+### Data ini & recode
 
-Using the training data, build a predictive model for the log number of shares on an article that minimizes expected prediction error on an unseen data set **using no more than 5 predictors**.  Your goal here should be to both select a good set of predictors and model as much of the variation within the outcome using the small set of predictors - nonlinearities, interactions, and all.  Compared to the big prediction model, it should be easier to find these quirks and improve the model to better model them.
+```{r}
+# take random sample data set for training & testing
+set.seed(123)
+train_df_q4 <- train_df[sample(x=nrow(train_df), size=7500, replace=FALSE),]
+test_df_q4 <- train_df[sample(x=nrow(train_df), size=2500, replace=FALSE),]
+# log(share) transformation
+train_df_q4$shares <- log(train_df_q4$shares)
+test_df_q4$shares <- log(test_df_q4$shares)
+#drop variable url
+train_df_q4 <- train_df_q4[,-1]
+test_df_q4 <- test_df_q4[,-1]
+# subset for later
+test_df_q4_predictor <- data.matrix(train_df_q4[, -60])
+test_df_q4_outcome <- data.matrix(train_df_q4$shares)
+```
 
-Please explain your thought process for the choices you make!
+### Variable selection(at most 5 variables)
 
-This process is a little less *standard* than the one for your big predictive model.  Rather than showing me the results of all the approaches you check, just summarize what things you tried to accomplish two tasks:
+We will work on variables selections on LASSO and random forest, and using GAM to check the relationship between each variables and log(share).
 
-  1. Selecting the 5 variables
-  2. Predicting the outcome using the five variables
-  
-At the end, please explicitly note the five variables that you chose and the method you used to produce your best predictive model.  Be sure to leverage both in-sample EPE estimates and estimates of EPE produced by a true holdout data set.
+#### LASSO variable selection
 
-Once you decide on a final model, use the data included in `midterm_test.csv` to produce a set of predictions for the test data.  These predictions should be exported as a .csv file with two columns - `ID` of the observation and the `prediction` produced by your model.  Please be sure to include a code block that demonstrates your method for doing this in your final submission.  Your predictions should be saved as "Midterm1Q3_Predictions.csv" and submitted along with your final solutions.
-  
+```{r}
+# find optimal lambda
+c_lasso_cv <- cv.glmnet(x = test_df_q4_predictor, y = test_df_q4_outcome,
+    family = "gaussian", alpha = 1, nfolds = 10, type.measure = "mse")
+optimalLambda <- c_lasso_cv$lambda.min # the optimal lambda that minimize MSE
+lasso_optimalModel <- glmnet(x = test_df_q4_predictor, y = test_df_q4_outcome,
+    family = "gaussian", alpha = 1, lambda = optimalLambda)
+opt_variableList <- lasso_optimalModel$beta
+opt_variableList
+```
+
+5 variables LASSO model suggests: global_rate_negative_words/ global_subjectivity/ n_unique_tokens/ LDA_00/ min_positive_polarity
+
+#### Random Forest variables selection
+
+```{r}
+# test and see how many variables we should include
+oob <- c()
+rf_mse <- c()
+for (i in 2:5) {
+  model <- ranger(data=train_df_q4, formula = shares~., mtry=i, num.trees=1000)
+  oob <- c(oob,model$prediction.error)
+  testPred <- predict(model, data=test_df_q4)
+  rf_mse <- c(rf_mse,mse(test_df_q4$shares, testPred$predictions))
+}
+mtry<-c(2,3,4,5)
+RFepe <- data.frame(mtry,oob,rf_mse)
+# mse suggests 5 variables
+ggplot(data=RFepe) +
+  geom_point(aes(x=mtry, y=rf_mse)) +
+  geom_line(aes(x=mtry, y=rf_mse)) +
+  theme_bw()
+# oob suggest 4 variables
+ggplot(data=RFepe) +
+  geom_point(aes(x=mtry, y=oob)) +
+  geom_line(aes(x=mtry, y=oob)) +
+  theme_bw()
+# RF model with 4 variables & 5 variables
+RF_model_4 <- ranger(data=train_df_q4, formula = shares~., mtry=4, num.trees=1000,importance='permutation')
+RF_model_5 <- ranger(data=train_df_q4, formula = shares~., mtry=5, num.trees=1000,importance='permutation')
+# find the top-importance variables for each model
+# we won't worry about the negative importance here as they're all generally small
+varImportance4 <- data.frame(var_importance=RF_model_4$variable.importance)
+arrange(varImportance4, desc(var_importance))
+varImportance5 <- data.frame(var_importance=RF_model_5$variable.importance)
+arrange(varImportance5, desc(var_importance))
+```
+
+4 variable RF model suggests: kw_avg_avg/ self_reference_avg_sharess /kw_max_avg / n_unique_tokens / (5th: kw_min_avg) 
+5 variable RF model suggests: kw_avg_avg/ self_reference_avg_sharess/ kw_min_avg/ kw_max_avg / self_reference_min_shares
+
+#### Variables selection sub-conclusion
+```{r}
+# check suggested variable with spline and decide the final variable subset
+checkGam<-gam(shares ~ s(kw_avg_avg) + s(self_reference_avg_sharess) + s(kw_min_avg) + s(kw_max_avg)+s(self_reference_min_shares)+s(global_rate_negative_words)+s(global_subjectivity)+s(n_unique_tokens)+s(LDA_00)+s(min_positive_polarity),data=train_df_q4,family = gaussian())
+plot(checkGam,pages=1)
+```
+We might don't want to approach data analysis on this data set with linear approaches, since most splines don't really show much linear relationship with share. we will move on with knn and random forest with both 4-variable and 5-variable data set
+
+### Model selection
+#### data recode with selected subset of data
+```{r}
+train_df_4RFvar<-data.frame(shares=train_df_q4$shares,kw_avg_avg=train_df_q4$kw_avg_avg,self_reference_avg_sharess=train_df_q4$self_reference_avg_sharess,kw_max_avg=train_df_q4$kw_max_avg,n_unique_tokens=train_df_q4$n_unique_tokens)
+test_df_4RFvar<-data.frame(shares=test_df_q4$shares,kw_avg_avg=test_df_q4$kw_avg_avg,self_reference_avg_sharess=test_df_q4$self_reference_avg_sharess,kw_max_avg=test_df_q4$kw_max_avg,n_unique_tokens=test_df_q4$n_unique_tokens)
+train_df_5RFvar<-data.frame(shares=train_df_q4$shares,kw_avg_avg=train_df_q4$kw_avg_avg,self_reference_avg_sharess=train_df_q4$self_reference_avg_sharess,kw_min_avg=train_df_q4$kw_min_avg,kw_max_avg=train_df_q4$kw_max_avg,self_reference_min_shares=train_df_q4$self_reference_min_shares)
+test_df_5RFvar<-data.frame(shares=test_df_q4$shares,kw_avg_avg=test_df_q4$kw_avg_avg,self_reference_avg_sharess=test_df_q4$self_reference_avg_sharess,kw_min_avg=test_df_q4$kw_min_avg,kw_max_avg=test_df_q4$kw_max_avg,self_reference_min_shares=test_df_q4$self_reference_min_shares)
+# list for oob and mse
+mse<-c()
+oob<-c()
+modelName<-c()
+# predictor and outcome df based on train_df_4RFvar and train_df_5RFvar
+# train set
+train_df_4RFvar_predictor <- data.matrix(train_df_4RFvar[, -1])
+train_df_4RFvar_outcome <- data.matrix(train_df_4RFvar$shares)
+train_df_5RFvar_predictor <- data.matrix(train_df_5RFvar[, -1])
+train_df_5RFvar_outcome <- data.matrix(train_df_5RFvar$shares)
+# test set
+test_df_4RFvar_predictor <- data.matrix(test_df_4RFvar[, -1])
+test_df_4RFvar_outcome <- data.matrix(test_df_4RFvar$shares)
+test_df_5RFvar_predictor <- data.matrix(test_df_5RFvar[, -1])
+test_df_5RFvar_outcome <- data.matrix(test_df_5RFvar$shares)
+```
+
+#### Random Forest model
+```{r}
+# random forest
+RFmodel_selected_4var<-ranger(data=train_df_4RFvar, formula = shares~., mtry=4, num.trees=1000)
+RFmodel_selected_5var<-ranger(data=train_df_5RFvar, formula = shares~., mtry=5, num.trees=1000)
+# OOB
+OOB_RF4var<-RFmodel_selected_4var$prediction.error
+OOB_RF5var<-RFmodel_selected_5var$prediction.error
+# out of sample MSE
+MSE_RF4var<-mse(predict(RFmodel_selected_4var, data=test_df_4RFvar)$predictions, test_df_4RFvar$shares)
+MSE_RF5var<-mse(predict(RFmodel_selected_5var, data=test_df_5RFvar)$predictions, test_df_5RFvar$shares)
+oob<-c(oob,OOB_RF4var,OOB_RF5var)
+mse<-c(mse,MSE_RF4var,MSE_RF5var)
+modelName<-c(modelName,"RF4var","RF5var")
+```
+
+#### KNN model
+```{r}
+# find the optimal k for knn
+knn_mTest<-function(train_pred,train_outcome,test_pred,test_outcome,k){
+  knn <- k
+  knn_mse_outOfSample <- c()
+  for (i in knn) {
+    knn_m <- knn.reg(train=train_pred, test=test_pred, y=train_outcome, k=i)
+    knn_mse_outOfSample <- c(knn_mse_outOfSample,mse(knn_m$pred, test_outcome))
+  }
+  p2_knn_df <- data.frame(knn,knn_mse_outOfSample)
+  ggplot(data=p2_knn_df) +
+    geom_point(aes(x=knn, y=knn_mse_outOfSample)) +
+    geom_line(aes(x=knn, y=knn_mse_outOfSample)) +
+    theme_bw()
+}
+# kList<-seq(5,1000,100)# optimal k=105
+kList<-seq(5,110,1)# k=33 for 5 var model; k=92 for 4 var model
+knn_mTest(train_df_4RFvar_predictor,train_df_4RFvar_outcome,test_df_4RFvar_predictor,test_df_4RFvar_outcome,kList)
+knn_mTest(train_df_5RFvar_predictor,train_df_5RFvar_outcome,test_df_5RFvar_predictor,test_df_5RFvar_outcome,kList)
+# KNN model for 4Var and 5Var
+knn_4Var<- knn.reg(train=train_df_4RFvar_predictor, test=test_df_4RFvar_predictor, y=train_df_4RFvar_outcome, k=92)
+knn_4Var_mseOut <- mse(knn_4Var$pred, test_df_4RFvar_outcome)
+knn_5Var<- knn.reg(train=train_df_5RFvar_predictor, test=test_df_5RFvar_predictor, y=train_df_5RFvar_outcome, k=33)
+knn_5Var_mseOut <- mse(knn_5Var$pred, test_df_5RFvar_outcome)
+mse<-c(mse,knn_4Var_mseOut,knn_5Var_mseOut)
+modelName<-c(modelName,"knn4Var","knn5Var")
+```
+
+
+#### Model selection sub-conclusion
+We randomly take three seeds(77/123/95) and compare the mse for the potential-optimal models we have so far. It turns out that Random Forest models genarally perform better than the KNN ones. We finalized on the random forest model with 4 selected variable performs the best across all seeds(though there is no significant difference between RF4variables and RF5variables).
+```{r}
+msePrint<-data.frame(modelName,mse)
+seed77MSE<-msePrint
+#seed123MSE<-msePrint
+#seed95MSE<-msePrint
+```
+
+### Prediction on midterm1_testNoShares.csv
+With our work earlier on, we now have our optimal model(RFmodel_selected_4var): Random Forest model on kw_avg_avg/ self_reference_avg_sharess /kw_max_avg / n_unique_tokens
+```{r}
+bestModel<-RFmodel_selected_4var
+test_df_predictor<-data.frame(kw_avg_avg=test_df$kw_avg_avg,self_reference_avg_sharess=test_df$self_reference_avg_sharess,kw_max_avg=test_df$kw_max_avg,n_unique_tokens=test_df$n_unique_tokens)
+bestPredShares<-predict(bestModel, data=test_df_predictor)$predictions
+outPutFile<-data.frame(ID=test_df$ID,shares_Pred=bestPredShares)
+# save the .csv
+write.csv(outPutFile,"Midterm1Q3_Predictions.csv", row.names = FALSE)
+```
+
 ## Question 5 - Interpreting the Subset Model (8 pts.)
+```{r}
+# plot the variable importance
+bestM<-ranger(data=train_df_4RFvar, formula = shares~., mtry=4, num.trees=1000,importance='permutation')
+p5_df <- data.frame(bestM$variable.importance)
+p5_df$var <- rownames(p5_df)
+p5_df <- p5_df %>% rename(var_imp = bestM.variable.importance)
+ggplot(data=p5_df, aes(x=var, y=var_imp)) +
+  geom_bar(stat='identity', width=0.75) + coord_flip() +
+  labs(x="Features", y="Variable Importance") +
+  theme_bw()
+p5_df %>% arrange(desc(var_imp))
+# variables: 
+# kw_avg_avg/ self_reference_avg_sharess /kw_max_avg / n_unique_tokens
+# bestModel
+```
 
-Using your predictive model from Question 3, explain how the prediction surface changes as a function of your predictors.  Since the set of predictors is much more manageable, discuss what types of articles you would predict to have the highest number of shares and what types would have the lowest number of shares.  Does the prediction surface over this small subset of predictors look the same as it did in the full model?  What changes?
+From question 4, we choose random forest model for good prediction performance, while we sacrifice the interpretability of the model. With our best model on our selected variables, we could only tell the importance of each selected variables shown above. We could see that the Avg. keyword (max. shares)[kw_max_avg] and Avg. keyword (avg. shares)[kw_avg_avg] takes a huge part of the variable importance, while the model also suugests some importance on Avg. shares of referenced articles in Mashable [self_reference_avg_sharess] and Rate of unique words in the content [n_unique_tokens]. The result is quite similar with what we got in the full model: all of our four varibels in Q4 are also in the top 8 importance of the full model; 3 out of 4 are the most importance among all variables in full model. 
 
-Using your model, come up with a set of actionable rules that you would pass to the Mashable writers to try to maximize the number of shares and discuss why this rule set makes sense in the context of the problem.  Then, discuss reasons why we might not expect the rules set to result in the expected increase in shares in the sense of "a change in $x$ results in a change in $y$".  Specifically think about how this method differs from a carefully designed causal analysis (think about confounding!).
+Since random forest doesn't return any coefficient as the linear models do, we don't really know for sure whether these variables are positively OR negatively correlate to the outcome[shares]. With our best educational guess, we might take a conjecture that highest number of shares articles will be those which: 1) keywords with good amount of shares(both top number of shares and average number of shares) in the past; 2) reference on high-shares articles; 3) using good amount of high rate unique words. The lowest number of shares articles will be those don't do well on our conjecture.
+
+Actionable rules: 
+1) have a good idea about popular "keywords" on Mashable and use those keywords as frequent as possible.If not sure what are those "keywords", use diverse vocabulary so that you will hit some by chance.
+2) include reference to the popular articles on Mashable. If not sure about what's the *most popular ones, maybe refer to as many articles as possible such that you will somehow hit one.
+3) use unique vocabulary with huge diversity.
+
+why we not expect the rule set makes sense:
+There are many confounding variables that we are unable to include in our model. For example, the recommend-article-to-reader algorithm might have bias on some types of articles and thus recommend those articles more frequently. In this way, those articles with high exposure to the public will naturally have larger audiences group and higher amount of shares.
 
 ## Question 6 - Building a Predictive Model with a Single Predictor (15 pts.)
 
