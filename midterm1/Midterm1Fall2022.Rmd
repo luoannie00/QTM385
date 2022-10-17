@@ -557,90 +557,6 @@ p6_result
 ```
 We recorded the EPE of KNN model using weekday_is_wednesday above. We can see that the in-sample EPE is surprisingly good, but since its oos EPE doesn't look ideal, we will wait and see other models. For easier comparison, we only recorded 5fold CV to be out in sample mse, since it's only slightly higher than 10fold.
 
-### Ridge
-```{r}
-p6_x <- data.matrix(strain_df_p6[,-60]) #pool of 59 potential variables
-p6_y <- data.matrix(strain_df_p6[,60])
-
-#scientific lambda
-p6_cv_ridge <- cv.glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=1, nfolds=10,
-                          type.measure="mse")
-p6_ridge <- glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=0, nfolds=10,
-                          lambda=p6_cv_ridge$lambda.min)
-p6_cv_ridge$lambda.min
-#graph, ideally one significant variable left when lambda is large
-cf1 <- c()
-cf2 <- c()
-for (i in 1:37) {
-  cf1 <- append(cf1, rownames(p6_ridge$beta)[i])
-  cf2 <- append(cf2, unname(p6_ridge$beta)[i])
-}
-cf <- data.frame(cf1, cf2)
-ggplot(data=cf, aes(x=cf1, y=cf2)) +
-  geom_bar(stat="identity", width=0.75) + coord_flip() +
-  labs(x="Features", y="Coefficient Estimate") +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5), 
-        axis.title.x = element_text(face="bold", colour="red", size = 12),
-        axis.title.y = element_text(face="bold", colour="red", size = 12))
-
-#big lambda
-p6_ridge <- glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=0, nfolds=10,
-                          lambda=1)
-#graph, ideally one significant variable left when lambda is large
-cf1 <- c()
-cf2 <- c()
-for (i in 1:37) {
-  cf1 <- append(cf1, rownames(p6_ridge$beta)[i])
-  cf2 <- append(cf2, unname(p6_ridge$beta)[i])
-}
-cf <- data.frame(cf1, cf2)
-ggplot(data=cf, aes(x=cf1, y=cf2)) +
-  geom_bar(stat="identity", width=0.75) + coord_flip() +
-  labs(x="Features", y="Coefficient Estimate") +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5), 
-        axis.title.x = element_text(face="bold", colour="red", size = 12),
-        axis.title.y = element_text(face="bold", colour="red", size = 12))
-
-#very big lambda
-p6_ridge <- glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=0, nfolds=10,
-                          lambda=10)
-cf1 <- c()
-cf2 <- c()
-for (i in 1:37) {
-  cf1 <- append(cf1, rownames(p6_ridge$beta)[i])
-  cf2 <- append(cf2, unname(p6_ridge$beta)[i])
-}
-cf <- data.frame(cf1, cf2)
-ggplot(data=cf, aes(x=cf1, y=cf2)) +
-  geom_bar(stat="identity", width=0.75) + coord_flip() +
-  labs(x="Features", y="Coefficient Estimate") +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5), 
-        axis.title.x = element_text(face="bold", colour="red", size = 12),
-        axis.title.y = element_text(face="bold", colour="red", size = 12))
-
-#crazy big lambda
-p6_ridge <- glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=0, nfolds=10,
-                          lambda=100)
-cf1 <- c()
-cf2 <- c()
-for (i in 1:37) {
-  cf1 <- append(cf1, rownames(p6_ridge$beta)[i])
-  cf2 <- append(cf2, unname(p6_ridge$beta)[i])
-}
-cf <- data.frame(cf1, cf2)
-ggplot(data=cf, aes(x=cf1, y=cf2)) +
-  geom_bar(stat="identity", width=0.75) + coord_flip() +
-  labs(x="Features", y="Coefficient Estimate") +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5), 
-        axis.title.x = element_text(face="bold", colour="red", size = 12),
-        axis.title.y = element_text(face="bold", colour="red", size = 12))
-```
-As we can see from the graph above, while we already made lambda very large, we cannot find a single variable that is significantly more important than others. This might be due to ridge's inability to shrink coefficients exactly to zero. So we move onto LASSO next without calculating EPE of ridge.
-
 ### LASSO
 ```{r}
 #scientific lambda
@@ -648,11 +564,10 @@ p6_cv_lasso <- cv.glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=1, nfolds=10,
                           type.measure="mse")
 p6_lasso <- glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=1,
                             lambda=p6_cv_lasso$lambda.min)
-p6_cv_lasso$lambda.min
-#graph, ideally one important variable left
+p6_lasso$beta
 cf1 <- c()
 cf2 <- c()
-for (i in 1:37) {
+for (i in 1:59) {
   cf1 <- append(cf1, rownames(p6_lasso$beta)[i])
   cf2 <- append(cf2, unname(p6_lasso$beta)[i])
 }
@@ -664,62 +579,13 @@ ggplot(data=cf, aes(x=cf1, y=cf2)) +
   theme(plot.title = element_text(hjust = 0.5), 
         axis.title.x = element_text(face="bold", colour="red", size = 12),
         axis.title.y = element_text(face="bold", colour="red", size = 12))
-
-#big lambda
-p6_lasso <- glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=1,
-                            lambda=0.002)
-cf1 <- c()
-cf2 <- c()
-for (i in 1:37) {
-  cf1 <- append(cf1, rownames(p6_lasso$beta)[i])
-  cf2 <- append(cf2, unname(p6_lasso$beta)[i])
-}
-cf <- data.frame(cf1, cf2)
-ggplot(data=cf, aes(x=cf1, y=cf2)) +
-  geom_bar(stat="identity", width=0.75) + coord_flip() +
-  labs(x="Features", y="Coefficient Estimate") +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5), 
-        axis.title.x = element_text(face="bold", colour="red", size = 12),
-        axis.title.y = element_text(face="bold", colour="red", size = 12))
-
-#very big lambda
-p6_lasso <- glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=1,
-                            lambda=0.01)
-cf1 <- c()
-cf2 <- c()
-for (i in 1:37) {
-  cf1 <- append(cf1, rownames(p6_lasso$beta)[i])
-  cf2 <- append(cf2, unname(p6_lasso$beta)[i])
-}
-cf <- data.frame(cf1, cf2)
-ggplot(data=cf, aes(x=cf1, y=cf2)) +
-  geom_bar(stat="identity", width=0.75) + coord_flip() +
-  labs(x="Features", y="Coefficient Estimate") +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5), 
-        axis.title.x = element_text(face="bold", colour="red", size = 12),
-        axis.title.y = element_text(face="bold", colour="red", size = 12))
-
-#crazy big lambda
-p6_ideal_lasso <- glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=1,
-                            lambda=0.087)
-cf1 <- c()
-cf2 <- c()
-for (i in 1:37) {
-  cf1 <- append(cf1, rownames(p6_ideal_lasso$beta)[i])
-  cf2 <- append(cf2, unname(p6_ideal_lasso$beta)[i])
-}
-cf <- data.frame(cf1, cf2)
-ggplot(data=cf, aes(x=cf1, y=cf2)) +
-  geom_bar(stat="identity", width=0.75) + coord_flip() +
-  labs(x="Features", y="Coefficient Estimate") +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5), 
-        axis.title.x = element_text(face="bold", colour="red", size = 12),
-        axis.title.y = element_text(face="bold", colour="red", size = 12))
+#variable we chose is global_rate_positive_words (46th var) since its absolute value of coefficient is biggest
+#p6_cv_lasso_op <- cv.glmnet(x=data.matrix(stest_df_p6[,46]), y=p6_y, family="gaussian", alpha=1,
+#                            nfolds=10, type.measure="mse")
+#p6_lasso_op <- glmnet(x=data.matrix(stest_df_p6[,46]), y=p6_y, family="gaussian", alpha=1,
+#                      lambda=p6_cv_lasso_op$lambda.min)
 ```
-We see from crazy big lambda that, while we finally shrinks down to only one variable, its coefficient is very close to zero. So we don't expect this LASSO model with univariable "kw_avg_avg" is going to have good predictive capability. We move onto polynomial expansion without calculating EPE of LASSO.
+While we found that, according to LASSO, "global_rate_positive_words" is a good variable, we cannot run LASSO model based on only this one variable. Since for other models, we would use a for loop to test all variables, LASSO cannot help us with variable selection. For the same reason, we will not use Ridge.
 
 ### Polynomial Expansion
 We continue to use strain_df_p6 and stest_df_p6
@@ -830,6 +696,16 @@ p6_result <- rbind(p6_result, p6_RF_result)
 p6_result
 ```
 
+### Conclusion and Plot
+Based on p6_result table, we can see that all methods produced "kw_avg_avg" as the most important variable for univariable predictions, so we will choose this variable. While all out-of-sample EPE are similar across models but KNN has a significantly lower in-sample EPE, we will not choose KNN since the variable we chose for KNN was quite arbiturary in the sense that the in-sample EPE of KNN didn't really produce "kw_avg_avg" as the most ideal predictor. Random Forest overall performs worse than others. Polynomial expansion and Spline (GAM) have more or less the same mse, and we choose to go with Spline (GAM) and we use "kw_avg_avg." 
+```{r}
+p6_optimal <- gam(shares ~ s(kw_avg_avg),data=strain_df_p6,family = gaussian())
+p6_spline_in <- p6_spline_optimal$gcv.ubre.dev
+p6_spline_in
+#out of sample
+p6_spline_out<-mse(stest_df_p6$shares,predict.gam(p6_spline_optimal,stest_df_p6))
+p6_spline_out
+```
 
 ## Question 7 - Do your models perform well on out-of-sample data? (10 pts.)
 
