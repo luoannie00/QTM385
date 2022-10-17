@@ -33,7 +33,7 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 1
 
 ```{r}
 #setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/midterm1')
-#setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/midterm1')
+setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/midterm1')
 train_df <- read.csv('midterm1_train.csv')
 test_df <- read.csv('midterm1_testNoShares.csv')
 ```
@@ -925,7 +925,25 @@ We continue to use strain_df_p6 and stest_df_p6
 ```{r}
 p6_LOESS <- c()
 p6_LOESS_index <- c()
-for (i in 1:59){
+#test for non-binary variable
+low1 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .05)
+low2 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .5)
+low3 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .75)
+low4 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .95)
+low_nb_df <- data.frame(mse(strain_df_p6$shares, predict(low1)), mse(strain_df_p6$shares, predict(low2)), mse(strain_df_p6$shares, predict(low3)), mse(strain_df_p6$shares, predict(low4)))
+#test for binary variable
+p6_LOESS <- c()
+p6_LOESS_index <- c()
+low1 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .05)
+low2 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .5)
+low3 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .75)
+low4 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .95)
+low_b_df <- data.frame(mse(strain_df_p6$shares, predict(low1)), mse(strain_df_p6$shares, predict(low2)), mse(strain_df_p6$shares, predict(low3)), mse(strain_df_p6$shares, predict(low4)))
+#seems like LOESS doesn't work well for binary variables. therefore we exclude them
+p6_LOESS <- c()
+p6_LOESS_index <- c()
+index_nb <- c(1:4, 6:12, 19:30, 39:59)
+for (i in index_nb){
   low1 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .05)
   low2 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .5)
   low3 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .75)
@@ -934,8 +952,35 @@ for (i in 1:59){
   p6_LOESS <- c(p6_LOESS, min(low_df))
   p6_LOESS_index <- c(p6_LOESS_index, which.min(low_df))
 }
+```
+
+### Random Forest
+```{r}
+# pick best variable
+# RF model with 4 variables & 5 variables
+RF_model_1 <- ranger(data=train_df_q4, formula = shares~., mtry=4, num.trees=1000,importance='permutation')
+RF_model_5 <- ranger(data=train_df_q4, formula = shares~., mtry=5, num.trees=1000,importance='permutation')
+# find the top-importance variables for each model
+# we won't worry about the negative importance here as they're all generally small
+varImportance4 <- data.frame(var_importance=RF_model_4$variable.importance)
+arrange(varImportance4, desc(var_importance))
+varImportance5 <- data.frame(var_importance=RF_model_5$variable.importance)
+arrange(varImportance5, desc(var_importance))
 
 
+
+
+
+RFmodel_p6<-ranger(data=strain_df_p6, formula = shares~., mtry=1, num.trees=1000)
+# OOB
+OOB_RF4var<-RFmodel_selected_4var$prediction.error
+OOB_RF5var<-RFmodel_selected_5var$prediction.error
+# out of sample MSE
+MSE_RF4var<-mse(predict(RFmodel_selected_4var, data=test_df_4RFvar)$predictions, test_df_4RFvar$shares)
+MSE_RF5var<-mse(predict(RFmodel_selected_5var, data=test_df_5RFvar)$predictions, test_df_5RFvar$shares)
+oob<-c(oob,OOB_RF4var,OOB_RF5var)
+mse<-c(mse,MSE_RF4var,MSE_RF5var)
+modelName<-c(modelName,"RF4var","RF5var")
 ```
 
 ## Question 7 - Do your models perform well on out-of-sample data? (10 pts.)
