@@ -478,10 +478,10 @@ p6_knn_in_df %>% arrange(p6_kfold_10) #data_channel_is_world, 10fold cv; weekday
 For KNN, we found that "weekday_is_wednesday" is a good uni-predictor for out-of-sample EPE, and "data_channel_is_world" is a good uni-predictor for in-sample EPE both for 5 and 10 fold CV. Since "weekday_is_wednesday" is also a relatively good predictor for in-sample error, we will go with this predictor for KNN model. 
 ```{r}
 colnames(strain_df_p6) #weekday_is_wednesday is when 33rd variable
-p6_knn_weekday_is_wednesday_mse <- data.frame(var = p6_knn_out_df[33,1], mse_out = p6_knn_out_df[33,2], five_fold = p6_knn_in_df[33,2], ten_fold = p6_knn_in_df[33,3])
-p6_knn_weekday_is_wednesday_mse
+p6_result <- data.frame(model = "KNN", var = p6_knn_out_df[33,1], mse_out = p6_knn_out_df[33,2], mse_in = p6_knn_in_df[33,2])
+p6_result
 ```
-We recorded the EPE of KNN model using weekday_is_wednesday above. We can see that the in-sample EPE is surprisingly good, but since its oos EPE doesn't look ideal, we will wait and see other models.
+We recorded the EPE of KNN model using weekday_is_wednesday above. We can see that the in-sample EPE is surprisingly good, but since its oos EPE doesn't look ideal, we will wait and see other models. For easier comparison, we only recorded 5fold CV to be out in sample mse, since it's only slightly higher than 10fold.
 
 Ridge
 ```{r}
@@ -647,17 +647,20 @@ ggplot(data=cf, aes(x=cf1, y=cf2)) +
 ```
 We see from crazy big lambda that, while we finally shrinks down to only one variable, its coefficient is very close to zero. So we don't expect this LASSO model with univariable "kw_avg_avg" is going to have good predictive capability. We move onto polynomial expansion without calculating EPE of LASSO.
 
-Polynomial Expansion:
+Polynomial Expansion
 We continue to use strain_df_p6 and stest_df_p6
 ```{r}
 #We choose LOOCV as there is less worry about bias and variance than other approaches and it's asymptotically unbiased for the in-sample EPE.
+
+#select variable based on in sample EPE
 lm_pred_metrics <- function(fit_model) {
   LOOCV <- mean((fit_model$residuals / (1-hatvalues(fit_model)))^2)
   return (LOOCV)
 }
-p6_poly_in <- c()
-#exclude binary variables and variables with small number of possible values since degree of polynomial cannot exceed possible values
+#exclude binary variables and variables with small number of possible values since degree of polynomial cannot exceed number of possible values
 index <- c(1:3, 7:12, 19:30, 39:59)
+p6_poly_mse <- c()
+p6_poly_deg <- c()
 for (i in index){
   p6_poly_1 <- lm(strain_df_p6$shares~poly(strain_df_p6[,i],1))
   p6_poly_2 <- lm(strain_df_p6$shares~poly(strain_df_p6[,i],2))
@@ -667,36 +670,71 @@ for (i in index){
   p6_poly_6 <- lm(strain_df_p6$shares~poly(strain_df_p6[,i],6))
   p6_poly_7 <- lm(strain_df_p6$shares~poly(strain_df_p6[,i],7))
   p6_poly_8 <- lm(strain_df_p6$shares~poly(strain_df_p6[,i],8))
-  p6_poly_df <- t(cbind(lm_pred_metrics(p6_poly_1), lm_pred_metrics(p6_poly_2),
+  p6_poly_df <- cbind(lm_pred_metrics(p6_poly_1), lm_pred_metrics(p6_poly_2),
                         lm_pred_metrics(p6_poly_3), lm_pred_metrics(p6_poly_4),
                         lm_pred_metrics(p6_poly_5), lm_pred_metrics(p6_poly_6),
-                        lm_pred_metrics(p6_poly_7), lm_pred_metrics(p6_poly_8)))
-  test <- p6_poly_df[1]
-  for (j in length(p6_poly_df)){
-    if (p6_poly_df[j] < test){
-      test <- p6_poly_df[j]
-    }
-  }
-  p6_poly_in <- c(p6_poly_in, test)
+                        lm_pred_metrics(p6_poly_7), lm_pred_metrics(p6_poly_8))
+  p6_poly_mse <- c(p6_poly_mse, min(p6_poly_df))
+  p6_poly_deg <- c(p6_poly_deg, which.min(p6_poly_df))
 }
-p6_poly_var <- data.frame(var = colnames(strain_df_p6[,index[which.min(p6_poly_in)]]))
-p6_poly_var
-
-test <- lm_pred_metrics(p6_poly_1)
-p6_poly_df <- t(cbind(lm_pred_metrics(p6_poly_1), lm_pred_metrics(p6_poly_2)))
-
-
-num <- c(1:10)
-p4p1_df <- data.frame(num, p4p1_df)
-#plot LOOCV for various degree of polynomial
-ggplot(data=p4p1_df) + 
-  geom_point(aes(x=num, y=LOOCV.1)) + 
-  geom_line(aes(x=num, y=LOOCV.1)) +
-  xlab("degree polynomial") + ylab('LOOCV') +
-  theme_bw()
-# We use LOOCV as our measure of EPE and find that third order of global polynomial that minimizes EPE. From the graph above, we could see that the LOOCV reaches minimum for degree polynomial=3.
+p6_poly <- data.frame(mse = p6_poly_mse, degree = p6_poly_deg)
+which.min(p6_poly$mse) #18th obs. in p6_poly df
+min(p6_poly$mse) #lowest mse is 0.8092535, degree is 7.
+index[which.min(p6_poly$mse)] #27th variable in strain_df_p6, which is kw_avg_avg
 ```
+From above, we see that, if we were to use a polynomial model, we would use variable "kw_avg_avg" and set function degree to be 7.
+```{r}
+#in sample EPE is:
+p6_poly_optimal <- lm(data = strain_df_p6, shares~poly(kw_avg_avg,7))
+p6_poly_in <- lm_pred_metrics(p6_poly_optimal)
+p6_poly_in
+#out of sample EPE is:
+p6_poly_pred <- p6_poly_optimal %>% predict(stest_df_p6)
+p6_poly_out <- mse(p6_poly_pred, stest_df_p6$shares)
+p6_poly_out
+#compile into final result
+p6_poly_result <- data.frame(model = "Polynomial_deg_7", var = "kw_avg_avg", mse_out = p6_poly_out, mse_in = p6_poly_in)
+p6_result <- rbind(p6_result, p6_poly_result)
+p6_result
 ```
+
+Spline
+We continue to use strain_df_p6 and stest_df_p6
+```{r}
+strain_df_p6 <- as.data.frame(strain_df_p6)
+stest_df_p6 <- as.data.frame(stest_df_p6)
+#in sample
+#non-binary variables
+index_nb_gam <- c(1:4, 6:12, 19:30, 39:59)
+nonbinary_s <- c()
+for (i in index_nb_gam){
+  p6_nb_spline_m <- gam(shares ~ s(strain_df_p6[,i]),data=strain_df_p6,family = gaussian())
+  nonbinary_s<-c(nonbinary_s, p6_nb_spline_m$gcv.ubre.dev)
+}
+min(nonbinary_s) #0.805739
+index_nb_gam[which.min(nonbinary_s)] #27th variable is kw_avg_avg (seems to be better candidate)
+#binary variables
+index_b_gam <- c(5, 13:18, 31:38)
+binary_s <- c()
+for (i in index_b_gam){
+  p6_b_spline_m <- gam(shares ~ strain_df_p6[,i],data=strain_df_p6,family = gaussian())
+  binary_s<-c(binary_s, p6_b_spline_m$gcv.ubre.dev)
+}
+min(binary_s) #0.8459762
+#since non-binary performs better based on in sample EPE, we use kw_avg_avg for spline
+p6_spline_optimal <- gam(shares ~ s(kw_avg_avg),data=strain_df_p6,family = gaussian())
+p6_spline_in <- p6_spline_optimal$gcv.ubre.dev
+p6_spline_in
+#out of sample
+p6_spline_out<-mse(stest_df_p6$shares,predict.gam(p6_spline_optimal,stest_df_p6))
+p6_spline_out
+#compile into final result
+p6_spline_result <- data.frame(model = "Spline", var = "kw_avg_avg", mse_out = p6_spline_out, mse_in = p6_spline_in)
+p6_result <- rbind(p6_result, p6_spline_result)
+p6_result
+```
+
+Now we proceed to LOESS
 
 ## Question 7 - Do your models perform well on out-of-sample data? (10 pts.)
 
