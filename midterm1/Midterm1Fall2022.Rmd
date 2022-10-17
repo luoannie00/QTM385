@@ -528,8 +528,8 @@ knn_reg_kfold <- function(x, y, k, folds){
   #model for prediction error
   p6_p <- c()
   for (i in 1:folds){
-    x_train <- x[sam6_KNN_kfold_train]
-    x_test <- x[sam6_KNN_kfold_test]
+    x_train <- x[sam6_KNN_kfold_train,]
+    x_test <- x[sam6_KNN_kfold_test,]
     y_train <- y[sam6_KNN_kfold_train]
     y_test <- y[sam6_KNN_kfold_test]
     p6_KNN_kfoldm <- knn.reg(train = as.data.frame(x_train), test = as.data.frame(x_test), y = as.data.frame(y_train), k = k)
@@ -540,8 +540,9 @@ knn_reg_kfold <- function(x, y, k, folds){
 p6_kfold_5 <- c()
 p6_kfold_10 <- c()
 for (j in 1:59) {
-  p6_kfold_5[j] <- knn_reg_kfold(strain_df_p6[,j], strain_df_p6[,60], 1, 5)
-  p6_kfold_10[j] <- knn_reg_kfold(strain_df_p6[,j], strain_df_p6[,60], 1, 10)
+  print(j)
+  p6_kfold_5[j] <- knn_reg_kfold(strain_df_p6[,j], strain_df_p6[,60], optimalk[j], 5)
+  p6_kfold_10[j] <- knn_reg_kfold(strain_df_p6[,j], strain_df_p6[,60], optimalk[j], 10)
 }
 p6_knn_in_df <- data.frame(var = colnames(strain_df_p6[,-60]), p6_kfold_5, p6_kfold_10)
 p6_knn_in_df %>% arrange(p6_kfold_5)
