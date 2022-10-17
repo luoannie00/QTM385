@@ -381,17 +381,16 @@ According to the variable importance plot from above based on our optimal random
 
 
 ## Question 4 - Building a Predictive Model with a Subset of Predictors (25 pts.)
-## Question 4 - Building a Predictive Model with a Subset of Predictors (25 pts.)
 ### Demonstration of our method for question 4 optimal model
 ```{r}
-# There are mainly two parts in the work for question4: variable selection and model selection. In variable selection, we will use LASSO and random forest to have some potential optimal-subset of variables. Then, we will use splines plot from the GAM function to have a general pictures of the relations between each variable and the log(share).Once we narrow down on 1/2 potential subset of variable, we will move on to the model selection part. We some analysis on what we got in the variable selection and previous work, we decide to apply non-linear model KNN and random forest to the subset of variables. With mse from each potential model, we will finalize the best model and make prediction on test data.
+# There are mainly two parts in the work for question4: variable selection and model selection. In variable selection, we will use LASSO and random forest to have some potential optimal-subset of variables. Then, we will use splines plot from the GAM function to have a general picture of the relations between each variable and the log(share).Once we narrow down on 1/2 potential subset of variable, we will move on to the model selection part. We some analysis on what we got in the variable selection and previous work, we decide to apply non-linear model KNN and random forest to the subset of variables. With mse from each potential model, we will finalize the best model and make prediction on test data.
 ```
 
 ### Data ini & recode
 
 ```{r}
 # take random sample data set for training & testing
-set.seed(123)
+set.seed(77)
 train_df_q4 <- train_df[sample(x=nrow(train_df), size=7500, replace=FALSE),]
 test_df_q4 <- train_df[sample(x=nrow(train_df), size=2500, replace=FALSE),]
 # log(share) transformation
