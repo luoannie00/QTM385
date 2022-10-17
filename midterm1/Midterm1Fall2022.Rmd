@@ -33,7 +33,7 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 1
 
 ```{r}
 #setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/midterm1')
-#setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/midterm1')
+setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/midterm1')
 train_df <- read.csv('midterm1_train.csv')
 test_df <- read.csv('midterm1_testNoShares.csv')
 ```
@@ -517,7 +517,7 @@ knn_reg_kfold <- function(x, y, k, folds, seed){
   set.seed(seed)
   #sample
   sam6_KNN_kfold_train <- as.numeric(sample(nrow(as.data.frame(x)), size=ceiling(nrow(as.data.frame(x))/folds), replace=FALSE))
-  sam6_KNN_kfold_test <- setdiff(seq(1,30000,1), sam6_KNN_kfold_train)
+  sam6_KNN_kfold_test <- setdiff(seq(1,7500,1), sam6_KNN_kfold_train)
   #model for prediction error
   p6_p <- c()
   for (i in 1:folds){
