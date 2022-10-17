@@ -802,39 +802,6 @@ p6_result <- rbind(p6_result, p6_spline_result)
 p6_result
 ```
 
-### LOESS
-Since LOESS is generally used for less than 4 variables, we can try this model for univariable.
-We continue to use strain_df_p6 and stest_df_p6
-```{r}
-p6_LOESS <- c()
-p6_LOESS_index <- c()
-#test for non-binary variable
-low1 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .55)
-low2 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .75)
-low3 <- loess(shares ~ strain_df_p6[,27], data = strain_df_p6, span = .95)
-low_nb_df <- data.frame(mse(strain_df_p6$shares, predict(low1)), mse(strain_df_p6$shares, predict(low2)), mse(strain_df_p6$shares, predict(low3)))
-#test for binary variable
-p6_LOESS <- c()
-p6_LOESS_index <- c()
-low1 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .55)
-low2 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .75)
-low3 <- loess(shares ~ strain_df_p6[,33], data = strain_df_p6, span = .95)
-low_b_df <- data.frame(mse(strain_df_p6$shares, predict(low1)), mse(strain_df_p6$shares, predict(low2)), mse(strain_df_p6$shares, predict(low3)))
-#seems like LOESS doesn't work well for binary variables. therefore we exclude them
-p6_LOESS <- c()
-p6_LOESS_index <- c()
-index_nb <- c(1:4, 6:12, 19:30, 39:59)
-for (i in index_nb){
-  low1 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .05)
-  low2 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .5)
-  low3 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .75)
-  low4 <- loess(shares ~ strain_df_p6[,i], data = strain_df_p6, span = .95)
-  low_df <- data.frame(mse(strain_df_p6$shares, predict(low1)), mse(strain_df_p6$shares, predict(low2)), mse(strain_df_p6$shares, predict(low3)), mse(strain_df_p6$shares, predict(low4)))
-  p6_LOESS <- c(p6_LOESS, min(low_df))
-  p6_LOESS_index <- c(p6_LOESS_index, which.min(low_df))
-}
-```
-
 ### Random Forest
 ```{r}
 # pick best variable
