@@ -39,98 +39,8 @@ test_df <- read.csv('midterm1_testNoShares.csv')
 ```
 
 Collaborators: Billy Ge, Latifa Tan, Annie Luo
-
-This is the first midterm data analysis exercise for QTM 385 - Introduction to Statistical Learning.  This exercise will use a single data set to ask a few questions related to creating predictive models for a continuous outcome.  This data set is larger and messier than those that have been given for the problem set exercises.  It is intended to provide you with a "real-world" scenario you might see if attempting to build a predictive model for a question you care about.  This assignment is worth 12.5% of your final grade and your final solutions should be submitted by 11:59 PM on October 17th.  Your final submission should include a .Rmd/.md/.ipynb file, a rendered .pdf/.html version of your notebook, and three .csv files including your predictions for an unseen test set.
-
-Unlike the problem sets, there will be little guidance as to what methods to use and how to interpret results.  The idea is that you can treat this like a real analysis exercise - applying different models, seeing what works and doesn't work, presenting the best possible model but being transparent about the downsides of you choice.  For each of the three tasks, you should consider a variety of potential methods and choose a single one as your "best" model.
-
-A review of fitting methods that we've covered in this course (thus far):
-
-  1. Linear regression via OLS
-  2. Polynomial regression
-  3. K-nearest neighbors regression
-  4. Shrinkage Methods (Ridge and LASSO)
-  5. Splines for univariate relationships
-  6. Local linear regression (LOESS)
-  7. Generalized Additive Models (GAMs)
-  8. Bagged Regression Trees and Random Forests 
-  9. (For the adventurous) Boosted Regression Trees
-  
-A review of concepts that should be central in your answers:
-
-  1. Training Error vs. Test Error
-  2. Train/Validation/Test Splits
-  3. Expected Prediction Error
-  4. Cross-validation
-  5. Predictor Selection
-  6. Linear vs. Nonlinear Relationships
-  7. Non-additive Errors
-  8. Bagging
-  9. (For the adventurous) Boosting
-  
-***
-
-## Data Set Overview
-
-This assignment revolves around a data set of 39,644 articles published by the website [mashable.com](https://mashable.com/) in 2013 and 2014.  Mashable is an international multi-platform media and entertainment company that can be seen as a news aggregator; the site publishes its own articles about current events and topics.  In many ways, Mashable was (and still is, but it's under different ownership now) a content aggregator.  The goal of Mashable was to provide an aggregate of important daily "news" and to generate ad-revenue via advertising clicks.  Therefore, the profitability of the website was directly tied to its ability to attract users to the site.  The most common way users were attracted was by shared articles passing through various social media outlets.  More shares leads to more ad revenue!
-
-The data set includes article urls, the number of shares on social media via the site's provided sharing mechanisms, and a collection of 59 covariates related to the length and content of the articles.  It is important to note that all 59 of these covariates could potentially be measured *prior to publication*.  The reason for this can be seen in the original paper that collected and used this data set - ["A Proactive Intelligent Decision Support System for Predicting the Popularity of Online News" by Kelwin Fernandes, Pedro Vinagre, and Paulo Cortez](https://repositorium.sdum.uminho.pt/bitstream/1822/39169/1/main.pdf).  In this paper, the authors want to demonstrate that predictive models can be used to create actionable suggestions to increase the number of shares that an article receives.  In doing so, they first build a predictive model that is expected to perform well on unseen data (articles that have not yet been written) and use this to create a rules set that provides expected improvements for new articles.  The proposed IDSS is operationalized over keywords - summary words that are used to categorize an article.  However, it is easy to see how a system of this sort could be used to create content suggestions for the writers, themselves, to write the "clickbaitiest" articles possible.
-
-The idea of interpretable and actionable rules sets is central to the study of fairness and bias in machine learning and actionable prediction models.  Though most of the models we've discussed in class are of the interpretable variety (KNN regression being the exception) - we can viably see how a predictor increases or decreases the resulting prediction - the resulting prediction surfaces can be very complex.  These methods allow "transparent" decision making processes and ensure that we're not making decision based on fragile or unethical logical links (redlining for mortgages, for example).  While this data set does not present any avenues for ethically dubious prediction methods (I don't think, at least), you may find associations that are clearly non-causal.  You'll discuss these as part of one of the problems.
-
-Many of the covariates presented as processed natural language processing (NLP) metrics that are intended to capture the topic, positive/negative sentiment (polarity), and subjectivity of the article.  I'll briefly summarize these concepts here:
-
-  1. Topics are presented using LDA dimensions that sum to 1.  Latent Dirichlet allocation is a common method of finding common "themes" and word associations across a large corpus of text documents.  The authors ran an LDA analysis and settled on 5 "topics" for the entire data set.  Each document is assumed to be a mixture of these 5 topics and can be described by a weight that corresponds to how much each document contains each topic.  A document with weight 1 on a single topic means that it is wholly decribed by that one topic while weight zero means that there is no part of the document that speaks to the topic.  Since this is a mixture, the weights sum to one.  There is no guarantee that the LDA topics are coherent, but you can find similarities between articles that are close to each topic.  Should you use one of the LDA dimensions in your models (especially your small models), you may want to undertake the task of figuring out what each of them means.  **A warning: since the LDA weights for each article sum to 1, placing all 5 into a model that doesn't select away collinear features will run into issues!**
-  
-  2. Polarity is a measure of the positiveness or negativeness of a document.  This is typically computed using a dictionary of positive and negative words and then using associational methods for determining whether words that are not recognized are positive or negative.  For this data set, negative polarity means that the document is largely negative while positive polarity means that the document is largely positive.  Related measures look for the rate of positive and negative words, title polarity, and conditional polarity for only positive or negative words.
-  
-  3. Subjectivity is a measure of how "fact-based" an article is.  Values of 0 mean that the document is fully fact-based while values of 1 mean that the document is wholly opinion based.  The machinery of the subjectivity measure largely mimics that of the polarity measure starting with a dictionary of fact vs. opinion based words and using associations to cover new words.
-  
-The rest of the covariates relate to specific features of the articles - keyword usage, data channels, etc.  A short description of each covariate can be seen in the `OnlineNewsPopularity.names` file included with this assignment.  Further descriptions of the data set can be found in the original paper.  The paper is relatively short, so I highly recommend reading it to get a sense of what the authors are doing and how the features are used to produce this automated decision making system.
-  
-A final thing to watch out for are two sets of unordered categorical predictors - day of publication and data channel.  All of these categorical predictors are already "dummied out", so you don't need to do anything special to make them usable.  However, be cautious if building a linear model!  The day of the week dummies are also accompanied by `is_weekend` which is just a linear combination of the other predictors.  The data channel predictors are binary variables that tell which large topic each article falls under - one of lifestyle, entertainment, business, social media, technology, world news/issues, and viral content.  Viral content was dropped from the predictor set.  As best I can tell, any article that has a zero on all other data channels falls into the viral content category.  You can include this variable in your models if you'd like by adding a column of appropriate indicators.
-
-***
-
-## Overall Goal
-
-For this assignment, you'll take on the role of a data scientist attempting to understand and **predict** what articles are most likely to to garner the most shares.  You will have access to a training set of 35,000 observations each corresponding to a specific article.  Each observation has 1) the article url, 2) the number of shares, and 3) 59 covariates related to the length and content of the article.  Your goal is to build predictive models that will predict the number of shares for an article on data that was not used to train the model.
-
-Your grade on this assignment will be a combination of:
-
-  1. Explaining your model building process
-  2. Assessing the out-of-sample predictive abilities for your chosen models
-  3. Interpreting your predictive models (plots and similar exercises)
-  4. Generating predictions using a test set of features **where you will not know the true outcome**
-  
-You do not need to try all prediction methods for each question.  Rather, I would like you to justify why you aren't considering certain methods.  For example, you can justify not using OLS by saying that we know that Ridge is guaranteed to produce a lower mean squared prediction error than OLS in almost any situation.  This is sufficient reasoning!
-
-We've discussed multiple ways of approximating the unseeable expected prediction error quantity.  The first set of approaches leverage the training data **only** to compute an estimate of the EPE - these methods include cross-validation and out-of-bag approaches.  The second method leverages an actual held out test data set that can be used to truly assess the EPE - the data is large enough to hold out a subset!  Given the size of this data set, I highly recommend that you use a combination of the two to make any model choice decisions.
-
-Most of the methods we've discussed in class will move quite quickly on data of this size.  KNN regression, bagged regression trees, random forests, and boosted trees will take a little longer.  If you run into problems with the scale of the data, feel free to take a random subset of the training data.  You won't be penalized for this reduction in data size, but your models are unlikely to score as well as the large $N$ models in terms of actual out-of-sample predictive ability.  You may also reduce the size of the data set to **tune** any hyperparameters for any specific model.  This may reduce the computational time needed to complete the assignment.  All said, I'm looking for students to attempt to produce good predictive models for the outcome but I am well aware of the computational limitations that you all will experience.  Just try your best!
-
-I have a hidden test set of 4,644 articles that were randomly selected from the full data set that will be used to assess the predictive accuracy of your chosen approaches.  You will provide three .csv files that include your predictions for the unseen test data set using the three models you choose in this exercise.  The test data set, included as `midterm1_testNoShares`, has all of the features of the original data set along with an additional `ID` column.  Your .csv files should only include two columns: the `ID` of the observation and the `prediction` made using your chosen method.      
-
-***
-
 ## Question 1 - Implementing a Random Forest Model (10 pts.)
-
-Let's walk through the process of implementing and interpreting a random forest model in this first question.
-
 ### Part 1
-
-Begin by taking a random sample of 7,500 training observations and use this as your training set.  Similarly, take a random sample of 2,500 training observations and use this as a heldout test set.  
-
-Using your reduced training set, implement a series of random forest using all predictors that creates predictions for the **log number of shares**.  For each random forest, you should generate 1,000 bootstrap trees.  To try to "tune" the random forest, vary the number of variables to consider in each bootstrap tree (`mtry` in `ranger`).  At a minimum, consider `mtry = c(2,4,6,8,10,20,30,40,50,59)`.
-
-*Note*: The bagged tree with all 59 predictors may take a few minutes to run.
-
-For each value of `mtry`, record the OOB error estimate and compute the MSE for your held out test data set.  Create a plot that shows these two curves as a function of the number of variables considered in each tree.
-
-Which number of features considered for each bootstrap tree yields the lowest OOB error?  What about the lowest error on your heldout test set?
-
-What does this say about the bias/variance tradeoff for this specific data set?  Does out-of-sample predictive accuracy favor higher variance among trees or lower bias in the estimates?
-
 ```{r}
 #question - is it okay to further downsize the training set??? yess
 #question - drop url??? yess
@@ -185,13 +95,6 @@ In addition, the specific dataset implies that we have more decrease in variance
 
 
 ### Part 2
-
-Using your chosen value for the number of variables to consider in your random forest, compute the permutation importance of the features for your subset of the training data.  Create a graph that demonstrates which variables are most important for the regression tree and which ones are least important.
-
-Explore the relationship between the two most important predictors and the log number of shares.  Can you parse out the relationship between these variables and the predictions?
-
-*Hint*: Try to see how these two variables and the true number of shares move together.  Then, do the same for the values of these variables and the corresponding predictions.  It probably isn't super clear, but you can likely see a bit of a trend.
-
 ```{r}
 p1p2_m <- ranger(data=strain_df_p1, formula = shares~., mtry=8, num.trees=1000, 
                  importance='permutation')
@@ -235,19 +138,6 @@ ggplot(data=pred_r) +
 
 
 ## Question 2 - Building a Big Predictive Model (25 pts.)
-
-Using all available predictors, come up with a predictive approach that maximizes the expected predictive accuracy for the **log number of shares** for articles in the unseen test set.  Your model for this problem should use any tools we've covered (or that you know from prerequisite courses) to build the predictive model that **minimizes the expected prediction error on the unseen test set**.  It can use any number of predictors and any functional form you can uncover.  Obviously, you don't have this test set, so you can never really know!  However, we've covered methods for approximating this value (to the best of our non-omniscient ability).
-
-Please explain your thought process as to the choices you make!
-
-For any method that you seriously consider as a candidate for producing the best possible predictive model, collect the following quantities and include them as a row in a table:
-
-  1. An in-sample estimate of the EPE generated using appropriate methods
-  2. A true out-of-sample estimate of the EPE generated using appropriate methods
-  3. The time (in seconds) required for you to tune the model and run it on the full training data **together**.  This time should include the computational time needed to choose the values of any hyperparameters and run the model of the full training data to get a prediction method for unseen data.  There are many different ways to interpret and accomplish this task, but there is a general trend that you should see when training your models. 
-
-Once you decide on a final model, use the data included in `midterm_test.csv` to produce a set of predictions for the test data.  These predictions should be exported as a .csv file with two columns - `ID` of the observation and the `prediction` produced by your model.  Please be sure to include a code block that demonstrates your method for doing this in your final submission.  Your predictions should be saved as "Midterm1Q1_Predictions.csv" and submitted along with your final solutions.
-
 ```{r}
 #question - how to solve the collinearity problem??? do not use gam or subset selection
 #question - does GAM model have collinearity problem??? yess
@@ -356,10 +246,6 @@ In addition, the lowest out of sample mse in the knn model is 0.79 when k equals
 
   
 ## Question 3 - Interpreting Your Big Predictive Model (7 pts.)
-
-Using your predictive model from question 1, explain how the predictions change as a  function of your predictors.  Specifically, try to figure out an interpretable set of conditions under which we would expect that an article is shared a lot and when we would expect it to be shared infrequently.  This is a high dimensional predictor space, so you won't be able to do this exactly, but do your best to come up with some general observations that dictate the predicted shares for an article.
-
-*Hint*: I'm guessing that the method you choose in Q1 will not yield a particularly predictable prediction function.  Just do your best to try to make some general conclusions.  The goal of this question is to get you thinking about the difference between a good predictive model and an interpretable one!
 
 ```{r}
 p3_m <- ranger(data=strain_df_p2, formula = shares~., mtry=8, num.trees=1000,
@@ -589,16 +475,7 @@ why we not expect the rule set makes sense:
 There are many confounding variables that we are unable to include in our model. For example, the recommend-article-to-reader algorithm might have bias on some types of articles and thus recommend those articles more frequently. In this way, those articles with high exposure to the public will naturally have larger audiences group and higher amount of shares.
 
 ## Question 6 - Building a Predictive Model with a Single Predictor (15 pts.)
-
-Now, take the idea of creating a small actionable predictive model to the extreme and find the single predictor model that minimizes expected prediction error for log of shares on the unseen test data set.  Discuss your process and how you decided on a final model.  Create a plot that shows your chosen variable against the log number of shares for the training data.  Create a similar plot for a heldout test data set.  Then, overlay a curve that shows the predicted value of log shares as a function of your feature on both plots.
-
-The difference between this question and the previous two questions is that there are a finite number of models to test!  After choosing a method that is most appropriate, just iterate over all possible features and compare two measures of EPE - an in-sample EPE method and actual performance on an out-of-sample data set.
-
-In your final deliverable, explain your process of choosing a model that is appropriate for modeling univariate relationships and demonstrate the process that you used to choose which predictor was the best.  Be sure to engage with different EPE measures.
-
-Once you decide on a final model, use the data included in `midterm_test.csv` to produce a set of predictions for the test data.  These predictions should be exported as a .csv file with two columns - `ID` of the observation and the `prediction` produced by your model.  Please be sure to include a code block that demonstrates your method for doing this in your final submission.  Your predictions should be saved as "Midterm1Q5_Predictions.csv" and submitted along with your final solutions.
-
-### Initial sampling and manipulation
+### Initial sampling and recoding
 ```{r}
 #sample training dataset
 set.seed(456)
