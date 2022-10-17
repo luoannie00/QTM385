@@ -700,11 +700,23 @@ p6_result
 Based on p6_result table, we can see that all methods produced "kw_avg_avg" as the most important variable for univariable predictions, so we will choose this variable. While all out-of-sample EPE are similar across models but KNN has a significantly lower in-sample EPE, we will not choose KNN since the variable we chose for KNN was quite arbiturary in the sense that the in-sample EPE of KNN didn't really produce "kw_avg_avg" as the most ideal predictor. Random Forest overall performs worse than others. Polynomial expansion and Spline (GAM) have more or less the same mse, and we choose to go with Spline (GAM) and we use "kw_avg_avg." 
 ```{r}
 p6_optimal <- gam(shares ~ s(kw_avg_avg),data=strain_df_p6,family = gaussian())
-p6_spline_in <- p6_spline_optimal$gcv.ubre.dev
-p6_spline_in
-#out of sample
-p6_spline_out<-mse(stest_df_p6$shares,predict.gam(p6_spline_optimal,stest_df_p6))
-p6_spline_out
+#training set
+ggplot(data=strain_df_p6, aes(x=kw_avg_avg, y=shares)) +
+  geom_point()+
+  geom_point(size=0.8, aes(x=kw_avg_avg,y=p6_optimal$fitted.values), color='red')
+#test set
+p6_pred <- predict(p6_optimal, newdata = stest_df_p6)
+ggplot(data=stest_df_p6, aes(x=kw_avg_avg, y=shares)) +
+  geom_point()+
+  geom_point(size=0.8, aes(x=kw_avg_avg,y=p6_pred), color='red')
+```
+CSV:
+```{r}
+p6PredShares<-predict(p6_optimal, newdata=test_df)
+p6outPutFile<-data.frame(ID=test_df$ID,shares_Pred=p6PredShares)
+# save the .csv
+write.csv(p6outPutFile,"Midterm1Q6_Predictions.csv", row.names = FALSE)
+print(Midterm1Q6_Predictions.csv)
 ```
 
 ## Question 7 - Do your models perform well on out-of-sample data? (10 pts.)
