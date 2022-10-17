@@ -498,18 +498,19 @@ We start by getting some sense on what might be a good choice of the uni-variabl
 #out-of-sample
 knn_p6_mse_out <- c()
 #test for all 59 variables
-knn <- seq(5,100,1)
+knn <- seq(5,100,5)
 for (j in 1:59) {
   knn_mse_out_k <- c()
   for (i in knn){ #choose k for each variable
-    knn_p6_k <- knn.reg(train=as.data.frame(strain_df_p6[,j]), test=as.data.frame(stest_df_p6[,j]), y=as.data.frame(strain_df_p6[,60]), k=i)
-    knn_mse_out_k <- c(knn_mse_out_k, mse(knn_p6_k$pred, stest_df_p6$shares))
+    knn_model_k <- knn.reg(train=as.data.frame(strain_df_p6[,j]), test=as.data.frame(stest_df_p6[,j]), y=as.data.frame(strain_df_p6[,60]), k=i)
+    knn_mse_out_k <- c(knn_mse_out_k, mse(knn_model_k$pred, stest_df_p6$shares))
   }
   knn_p6_m <- knn.reg(train=as.data.frame(strain_df_p6[,j]), test=as.data.frame(stest_df_p6[,j]), y=as.data.frame(strain_df_p6[,60]), k=knn[which.min(knn_mse_out_k)])
   knn_p6_mse_out <- c(knn_p6_mse_out,mse(knn_p6_m$pred, stest_df_p6$shares))
 }
 p6_knn_out_df <- data.frame(var = colnames(strain_df_p6[,-60]), knn_p6_mse_out)
 p6_knn_out_df %>% arrange(knn_p6_mse_out) #weekday_is_wednesday; data_channel_is_world is 13th
+# min mse is kw_max_avg
 
 #in-sample using KCV
 knn_reg_kfold <- function(x, y, k, folds, seed){
