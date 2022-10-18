@@ -500,7 +500,7 @@ There are many confounding variables that we are unable to include in our model.
 ### Initial sampling and recoding
 ```{r}
 #sample training dataset
-set.seed(787)
+set.seed(456)
 sam_train_p6 <- as.numeric(sample(x=nrow(train_df), size=30000, replace=FALSE))
 sam_test_p6 <- setdiff(seq(1,35000,1), sam_train_p6)
 strain_df_p6 <- train_df[sam_train_p6,]
@@ -532,18 +532,17 @@ for (j in 1:59) {
     knn_mse_out_k <- c(knn_mse_out_k, mse(knn_model_k$pred, stest_df_p6$shares))
   }
   knn_p6_m <- knn.reg(train=as.data.frame(strain_df_p6[,j]), test=as.data.frame(stest_df_p6[,j]), y=as.data.frame(strain_df_p6[,60]), k=knn[which.min(knn_mse_out_k)])
+  optimalk <- c(optimalk, knn[which.min(knn_mse_out_k)])
   variableIndex<-c(variableIndex,j)
   knn_p6_mse_out <- c(knn_p6_mse_out,mse(knn_p6_m$pred, stest_df_p6$shares))
 }
 p6_knn_out_df <- data.frame(var = colnames(strain_df_p6[,-60]), knn_p6_mse_out)
 p6_knn_out_df %>% arrange(knn_p6_mse_out)
-optimalK_var_list<-data.frame(varIndex=variableIndex,optK=optimalk)
-#most ideal variable is kw_avg_avg based on out-of-sample EPE
+#most ideal variable is kw_avg_avg based on out-of-sample EPE, which is 0.8152503
 
 #in-sample using KCV
 p6_knn_inMSE <- c()
 for (j in 1:59) {
-  print(j)
   knn_model_k <- knn.reg(train=as.data.frame(strain_df_p6[,j]),
                          test=as.data.frame(strain_df_p6[,j]),
                          y=as.data.frame(strain_df_p6[,60]),
@@ -552,13 +551,10 @@ for (j in 1:59) {
                                      strain_df_p6$shares))
 }
 p6_knn_in_df <- data.frame(var = colnames(strain_df_p6[,-60]), p6_knn_inMSE)
-p6_knn_in_df %>% arrange(p6_knn_in_df)
-p6_knn_in_df %>% arrange(desc(p6_knn_inMSE))
-
+p6_knn_in_df %>% arrange(p6_knn_in_df$p6_knn_inMSE)
 ```
-For KNN, we found that "kw_avg_avg" is a good uni-predictor for out-of-sample EPE, and "data_channel_is_world" is a good uni-predictor for in-sample EPE both for 5 and 10 fold CV. Since variables picked based on in-sample and out-of-sample EPE are very different, we will go with "kw_avg_avg" as other models all agree on "kw_avg_avg" being the best univariable.
+For KNN, we found that "kw_avg_avg" is a good uni-predictor for both out-of-sample and in-sample EPE. Therefore, we will go with "kw_avg_avg" for our KNN model.
 ```{r}
-colnames(strain_df_p6) #weekday_is_wednesday is when 27th variable
 p6_result <- data.frame(model = "KNN", var = p6_knn_out_df[27,1], mse_out = p6_knn_out_df[27,2], mse_in = p6_knn_in_df[27,2])
 p6_result
 ```
@@ -566,6 +562,8 @@ We recorded the EPE of KNN model using weekday_is_wednesday above. We can see th
 
 ### LASSO
 ```{r}
+p6_x <- data.matrix(strain_df_p6[,-60])
+p6_y <- data.matrix(strain_df_p6[,60])
 #scientific lambda
 p6_cv_lasso <- cv.glmnet(x=p6_x, y=p6_y, family="gaussian", alpha=1, nfolds=10,
                           type.measure="mse")
@@ -694,17 +692,15 @@ p6_rf_test <- stest_df_p6 %>% select(kw_avg_avg, shares)
 RFmodel_p6<-ranger(data=p6_rf_train, formula = shares~., mtry=1, num.trees=1000)
 # OOB
 OOB_p6<-RFmodel_p6$prediction.error
-OOB_p6 #in-sample EPE is 1.07784
 # out of sample MSE
 p6_RF_out<-mse(predict(RFmodel_p6, data=p6_rf_test)$predictions, p6_rf_test$shares)
-p6_RF_out #out-of-sample EPE is 1.089439
 p6_RF_result <- data.frame(model = "Random Forest", var = "kw_avg_avg", mse_out = p6_RF_out, mse_in = OOB_p6)
 p6_result <- rbind(p6_result, p6_RF_result)
 p6_result
 ```
 
 ### Conclusion and Plot
-Based on p6_result table, we can see that all methods produced "kw_avg_avg" as the most important variable for univariable predictions, so we will choose this variable. While all out-of-sample EPE are similar across models but KNN has a significantly lower in-sample EPE, we will not choose KNN since the variable we chose for KNN was quite arbiturary in the sense that the in-sample EPE of KNN didn't really produce "kw_avg_avg" as the most ideal predictor. Random Forest overall performs worse than others. Polynomial expansion and Spline (GAM) have more or less the same mse, and we choose to go with Spline (GAM) and we use "kw_avg_avg." 
+Based on p6_result table, we can see that all methods produced "kw_avg_avg" as the most important variable for univariable predictions, so we will choose this variable. Random Forest overall performs worse than others. Polynomial expansion, Spline (GAM), and KNN have more or less the same mse, and we decide to go with Spline (GAM) and we use "kw_avg_avg." 
 ```{r}
 p6_optimal <- gam(shares ~ s(kw_avg_avg),data=strain_df_p6,family = gaussian())
 #training set
@@ -723,7 +719,6 @@ p6PredShares<-predict(p6_optimal, newdata=test_df)
 p6outPutFile<-data.frame(ID=test_df$ID,shares_Pred=p6PredShares)
 # save the .csv
 write.csv(p6outPutFile,"Midterm1Q6_Predictions.csv", row.names = FALSE)
-print(Midterm1Q6_Predictions.csv)
 ```
 
 ## Question 7 - Do your models perform well on out-of-sample data? (10 pts.)
