@@ -1,0 +1,323 @@
+
+---
+title: 'Problem Set #4'
+author: "Kevin McAlister"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: no
+    toc_depth: '2'
+  prettydoc::html_pretty:
+    df_print: kable
+    highlight: github
+    theme: leonids
+    toc: no
+    toc_depth: 2
+    toc_float:
+      collapsed: no
+  html_document:
+    df_print: paged
+    toc: no
+    toc_depth: '2'
+urlcolor: blue
+---
+
+```{r, include=FALSE}
+library(ggplot2)
+library(data.table)
+library(tidyverse)
+library(glmnet)
+library(MASS)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
+```
+
+This is the fourth problem set for QTM 385 - Intro to Statistical Learning.  This homework will cover applied exercises related to classification methods. 
+
+Please use the intro to RMarkdown posted in the Intro module and my .Rmd file as a guide for writing up your answers.  You can use any language you want, but I think that a number of the computational problems are easier in R.  Please post any questions about the content of this problem set or RMarkdown questions to the corresponding discussion board.
+
+Your final deliverable should be two files: 1) a .Rmd/.ipynb file and 2) either a rendered HTML file or a PDF.  Students can complete this assignment in groups of up to 3.  Please identify your collaborators at the top of your document.  All students should turn in a copy of the solutions, but your solutions can be identical to those of your collaborators.
+
+This assignment is due by October 27th, 2022 at 11:59 PM EST.  
+
+Collaborators: Billy Ge, Latifa Tan, Annie Luo
+
+***
+
+## Problem 1: The Multivariate Normal Distribution (20 pts.)
+
+The multivariate normal distribution is an important distribution for the study of multivariate statistical models.  Specifically, the multivariate normal distribution is one of just a few ways to parametrically specify a data generating process that encodes the covariance between pairs of random variables.  A random vector $\boldsymbol x \in \mathbb{R}^P$ is said to follow a multivariate normal distribution if:
+
+$$f(\boldsymbol x \mid \boldsymbol \mu , \Sigma) \sim \mathcal{N}_P(\boldsymbol x \mid \boldsymbol \mu , \Sigma) = (2 \pi)^{-\frac{P}{2}} \text{det}(\Sigma)^{-\frac{1}{2}} \exp \left[-\frac{1}{2} (\boldsymbol x - \boldsymbol \mu )' \Sigma^{-1} (\boldsymbol{x} - \boldsymbol \mu) \right]$$
+
+Suppose we have $N$ iid draws from an unknown multivariate normal distribution.  We can specify the joint log-likelihood as:
+
+$$\ell \ell (\boldsymbol x \mid \boldsymbol \mu , \Sigma) = -\frac{NP}{2} \log 2 \pi - \frac{N}{2} \log \text{det}(\Sigma) - \frac{1}{2} \sum \limits_{i = 1}^N (\boldsymbol x_i - \boldsymbol \mu )' \Sigma^{-1} (\boldsymbol{x}_i - \boldsymbol \mu)$$
+
+Show that the maximum likelihood estimates of the parameters are:
+
+$$\hat{\boldsymbol \mu} = \frac{1}{N} \sum \limits_{i = 1}^N \boldsymbol{x}_i$$
+
+$$\hat{\Sigma} = \frac{1}{N} \sum \limits_{i = 1}^N (\boldsymbol x_i - \hat{\boldsymbol \mu})(\boldsymbol x_i - \hat{\boldsymbol \mu})'$$
+
+Some hints:
+
+1. Let $\gamma = y'Ay$ such that $\gamma$ evaluates to a scalar:
+  
+  $$\frac{\partial \gamma}{\partial y} = 2Ay$$
+  
+2. Let $\gamma = y'A^{-1}y$ such that $\gamma$ evaluates to a scalar:
+  
+  $$\frac{\partial \gamma}{\partial A^{-1}} = yy'$$
+  
+This arises because of a trace trick rearrangement, $\gamma = y'A^{-1}y = \text{tr}(yy'A^{-1})$
+  
+3. A well-known matrix identity is:
+  
+  $$\frac{\partial \log \text{det}(A)}{\partial A^{-1}} = A$$
+  
+when $A$ is symmetric.
+
+4. You'll have more luck with the second one if you differentiate with respect to $\Sigma^{-1}$ rather than $\Sigma$.
+
+## Problem 2: Cancer Data (40 Points)
+
+In a number of data sets, the predictors are a collection of ordered categorical ratings of objects.  These predictors are then used to classify objects into categories.  In class, we discussed plausibly continuous predictors (like income) and unordered categorical predictors (like manufacturing country).  However, we did not spend time discussing ordered categorical predictors.  This problem will see you work with two ordered categorical predictors - rating of uniformity of cell size (`UCellSize`: 1-10 with 10 being most irregular) and single epithelial cell size (`SECellSize`: 1-10 with 10 being largest) - trying to predict whether or not a cell is cancerous (`Malignant` is one if cancerous, 0 otherwise).
+
+The problem is that there is no in-between: we must either treat the predictor as an unordered outcome and lose any information that comes from seeing how the predictor increases or decreases while preserving its discreteness **or** treat the predictor as continuous preserving any ordering but losing its discrete nature.  Each choice comes with some downside, so we'll see how each one works on the training data set and use it to assess predictive accuracy on the test data set.
+
+```{r}
+setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/#4')
+cancer_train <- read.csv('cancerTrain.csv')
+cancer_test <- read.csv('cancerTest.csv')
+wine_train <- read.csv('wineTrain.csv')
+```
+
+### Part 1 (15 points)
+
+If we choose to treat each predictor as a discrete input, then we can use a generative classifier built via Bayes' theorem to create predictions that preserve dependencies between the predictors.  For discrete predictors $X$ and $Z$, the classifier can be built using the following formula:
+
+$$P(y = 1 | X = x , Z = z) = \frac{P(X = x,Z = z | y = 1)P(y = 1)}{P(X = x,Z = z | y = 1)P(y = 1) + P(X = x,Z = z | y = 0)P(y = 0)}$$
+
+Using the cancer training data, create a lookup table that encodes the probability that an observation with $X = x$ **and** $Z = z$ is malignant.  This should be a $10 \times 10$ table where each element corresponds to a possible $\{x,z\}$ pair.  For some elements of this table, there are zero elements in the training set!  These elements should be recorded as missing since we can't compute a probability using this approach.
+
+Along with the probability lookup table, create a corresponding table that encodes the **Bayes' classifier** - for a given $\{x,z\}$ pair, which class has the highest probability of occurrence?
+
+What is the general relationship between these predictors and the probability that a cell is cancerous?  Does it appear that we've missed some information by treating this problem in an unordered discrete fashion?
+
+```{r}
+p2p1_df1 <- data.frame(matrix(nrow = 10, ncol = 10))
+
+malignant_df <- cancer_train %>% filter(Malignant == 1)
+malignant_prob <- nrow(malignant_df)/500
+non_malignant_df <- cancer_train %>% filter(Malignant == 0)
+non_malignant_prob <- nrow(non_malignant_df)/500
+
+for (i in 1:10) {
+  for (j in 1:10) {
+    temp_df1 <- malignant_df %>% filter(UCellSize == i & SECellSize == j)
+    temp_df2 <- non_malignant_df %>% filter(UCellSize == i & SECellSize == j)
+    
+    if (nrow(temp_df1) == 0) {
+      p2p1_df1[i,j] <- NA
+      next
+    }
+    
+    result_numerator <- nrow(temp_df1)/nrow(malignant_df) * malignant_prob
+    result_denominator <- result_numerator + nrow(temp_df2)/nrow(non_malignant_df) * non_malignant_prob
+    p2p1_df1[i,j] <- result_numerator/result_denominator
+  }
+}
+```
+
+```{r}
+p2p1_df2 <- data.frame(matrix(nrow = 10, ncol = 10))
+
+for (i in 1:10) {
+  for (j in 1:10) {
+    if (is.na(p2p1_df1[i,j])) {
+      next
+    }
+    else if (p2p1_df1[i,j] > 0.5) {
+      p2p1_df2[i,j] <- 1
+    }
+    else if (p2p1_df1[i,j] < 0.5) {
+      p2p1_df2[i,j] <- 0
+    }
+    #how to deal with it???
+    else if (p2p1_df1[i,j] == 0.5) {
+      p2p1_df2[i,j] <- 1
+    }
+  }
+}
+```
+
+
+### Part 2 (15 points)
+
+Now, build classifiers that treat the two predictors as continuous (and ordered, in turn).  Specifically, use the training data to train 1) a logistic regression classifier and 2) a QDA classifier.  Using these two classifiers, create probability (e.g. what is the probability that an observation where $X = x$ and $Z = z$ is in class 1?) and Bayes' classifier (e.g. what is the highest probability class?) tables for each training method for each possible combination of $x$ and $z$.  
+
+How do these tables differ from the ones computed in part 1?  Have we lost anything by treating the predictors as continuous when they are truly discrete?
+
+```{r}
+#logistic regression classifier
+p2p2_logistic <- glm(data=cancer_train, 
+                     formula = Malignant ~ UCellSize + SECellSize,
+                     family = binomial(link='logit'))
+
+UCellSize <- rep(seq(1,10,1),10)
+SECellSize <- rep(seq(1,10,1),each=10)
+p2p2_df <- data.frame(UCellSize, SECellSize)
+p2p2_df$logistic <- predict(p2p2_logistic, type='response', newdata=p2p2_df)
+
+p2p2_df1 <- data.frame(matrix(nrow = 10, ncol = 10))
+for (i in 1:10) {
+  for (j in 1:10) {
+    temp <- p2p2_df %>% filter(UCellSize==i, SECellSize==j)
+    p2p2_df1[i,j] <- temp[1,'logistic']
+  }
+}
+```
+
+```{r}
+p2p2_df2 <- data.frame(matrix(nrow = 10, ncol = 10))
+for (i in 1:10) {
+  for (j in 1:10) {
+    if (p2p2_df1[i,j] > 0.5) {
+      p2p2_df2[i,j] <- 1
+    }
+    else {
+      p2p2_df2[i,j] <- 0
+    }
+  }
+}
+```
+
+```{r}
+#QDA classifier
+p2p2_x <- cbind(cancer_train$UCellSize, cancer_train$SECellSize)
+p2p2_y <- cancer_train$Malignant
+p2p2_qda <- qda(x=p2p2_x, grouping=p2p2_y, formula = Malignant ~ UCellSize + SECellSize)
+
+p2p2_testx <- cbind(p2p2_df$UCellSize, p2p2_df$SECellSize)
+p2p2_df$qda <- predict(p2p2_qda, newdata=p2p2_testx)$posterior[,2]
+p2p2_df3 <- data.frame(matrix(nrow = 10, ncol = 10))
+for (i in 1:10) {
+  for (j in 1:10) {
+    temp <- p2p2_df %>% filter(UCellSize==i, SECellSize==j)
+    p2p2_df3[i,j] <- temp[1,'qda']
+  }
+}
+```
+
+```{r}
+p2p2_df4 <- data.frame(matrix(nrow = 10, ncol = 10))
+for (i in 1:10) {
+  for (j in 1:10) {
+    if (p2p2_df3[i,j] > 0.5) {
+      p2p2_df4[i,j] <- 1
+    }
+    else {
+      p2p2_df4[i,j] <- 0
+    }
+  }
+}
+```
+
+
+### Part 3 (10 points)
+
+Now, let's use the three models to create predictions for the test set and compare the results to the true class.  For each observation in the test set, compute the probability that the cell is malignant using each of the three tables computed in parts 1 and 2.  Using these values, compute the deviance ($-2 \times \sum \limits_{i = 1}^N \log P(\hat{y}_i = y_i)$) and the proportion of observations incorrectly classified under the Bayes' classifier.  Which method performs best?  Worst?
+
+Under what conditions might we expect the unordered discrete model to perform better than the continuous predictor one?  Under what conditions might we expect the opposite to hold?
+
+Note: There is one big weakness of the discrete Bayes' theorem approach.  Briefly discuss this weakness and then skip any affected observations when computing the average loss.
+
+## Problem 3: Wine Data (40 points)
+
+The Wine data set is a classic prototyping data set for classification methods.  The data set revolves around a 13 different measurements of the chemical properties of different wines that originate from three different *cultivars* (varieties of plants - in this case, grapes - that have been produced by selective breeding).  The goal of the classification task is to create a classifier for the three different *cultivars* using only the chemical properties.
+
+The Wine data set only has 178 observations, so it is too small to split into training and test splits.  Therefore, cross-validation methods are needed to approximate expected prediction error.
+
+### Part 1 (15 points)
+
+Let's start with only 2 predictors: Color and OD280.  Start by creating a plot that shows the predictor values in the training data colored by their class.  Can you see approximately where the decision boundaries should be?
+
+Using the training data, train a multinomial logistic regression classifier, a LDA classifier, a QDA classifier, and a Naive Bayes classifier assuming normal conditional marginals.  For each classifier, produce a plot that shows the Bayes' classifier as a function of Color and OD280 for the **minimum bounding box** implied by the predictors (which is just a fancy way of saying predict the class for many combinations of predictors within the minimum and maximum of each predictor).  How does the **decision boundary** differ between the 3 classifiers?  Which one appears to do the best at capturing the true decision boundary within the data?
+
+Hint: `Color` ranges from approximately 1 to 13 and `OD280` ranges from approximately 1 to 4.  There are a lot of approaches to creating the decision plots, but I think that doing a grid evaluation is easiest.
+
+### Part 2 (15 points)
+
+Now, let's work with all 13 predictors.  The goal of this exercise is to build a model that best predicts out of sample wines, so use 10-fold cross validation to compute an estimate of the expected prediction error for three different classifiers - multinomial logistic regression, QDA, and naive Bayes with normal marginals.  For each classifier, compute the 10-fold estimate of the deviance **and** the misclassification rate with respect to the Bayes' classifier.
+
+Which model performs best?  Worst?
+
+### Part 3 (10 points)
+
+Broadly discuss situations where Naive Bayes is likely to outperform QDA.  Think about this from a loss perspective as well as a computational perspective.  
+
+  - Consider the MLE for the multivariate normal you derived above - when do you think this computation would become time and/or computer space prohibitive?  For $P$ features, we have a $P \times P$ covariance matrix.  How many free parameters are there in this matrix?
+  - What kind of assumption are we making about the marginal distribution of each feature using QDA (or LDA, even)?
+  
+***
+
+## Computational Resources
+
+This problem set covers a number of different methods for creating classifiers.  Here, I'll discuss a few computational resources that will assist you when completing this problem set.
+
+### Logistic Regression
+
+In R, logistic regression is pretty easy to implement.  Here, we just use the `glm()` function included in base R.  For training logistic regression models, the only argument that makes the setup any different than standard linear models is `family = binomial(link = "logit")` which tells the function to compute the outcome using the logistic link function.
+
+When producing predictions using `glm()`, `predict` works in the same way as with `lm()`.  However, there is an additional argument, `type = `.  The default type of prediction is the `link` prediction which produces log-odds for a standard logistic regression model.  Setting `type = 'response'` returns the probability that the observation belongs to class 1.  You can get the probability that the observation belongs to class 0 by subtracting the returned probability from 1.
+
+### Multinomial Logistic Regression
+
+There are many implementations of multinomial logistic regression that all have similar flavors.  My preferred implementation is the `multinom()` function in the `nnet` package.  `multinom` functions much like `lm()` in that it allows you to use formula notation to implement your model (e.g. `y ~ ., data = df` to run a multinomial logistic regression on the response using all other variables as features).  The key difference here is that `y` **must be coded as a factor**.  You can convert the output to a factor by using `factor()`.  The regression will then run on the $K$-level factor.
+
+The coefficients for multinomial logistic regression models aren't all that meaningful, so we'll just talk about the predictions methods.  To create predictions using `multinom()`, you just use `predict()` as with `lm()`.  There are two types of predictions that can be produced - `type = 'class'` produces the class with the highest probability while `type = 'prob'` produces a matrix with $K$ columns that shows the predicted probability that each observation belongs to each class.  Using these probabilities, you can produce any error metrics you wish.
+
+### Quadratic Discriminant Analysis
+
+QDA can be implemented easily in R using the `qda()` function in the `MASS` package.  Again, QDA can be implemented using the familiar formula framework.  As with multinomial logistic regression, the response variable should be converted to a factor.
+
+QDA has a predict method that, by default, will return a list with two elements - the first is the class associated with the highest probability of occurrence and the second is a $K$ column matrix that includes the probabilities that the observation belongs to each class.
+
+### Naive Bayes
+
+There are lots of implementations of a naive Bayes' classifier in R.  My preferred implementation is `naive_bayes` in the `naivebayes` package.  Again, NB can be implemented using the standard formula language.  `y` should be coded as a factor (though this implementation accepts character vectors or logicals).  There is one argument which you might find useful in later applications of NB - `usekernel`.  The default argument of `usekernel = FALSE` assumes that any numeric features should be modeled using conditionally independent normal distributions.  If `usekernel = TRUE`, then the marginal distribution for each feature will be constructed using a kernel density estimator.  In theory, with large N, this would provide better estimates of the probability that we would see a value given the class label.  However, using KDE on small N data sets can lead to overfitting.
+
+NB's predict method closely mimics that of `multinom` in `nnet`.  There are two types: `class` which returns the class with the highest probability of occurrence and `prob` which returns a $K$-column matrix of probabilities that each observation belongs to each class.
+
+### K-Fold Cross Validation
+
+All of the classifiers used in the third question do not admit a clean AIC, BIC, or analytical formula for CV metrics.  Therefore, you'll need to use K-fold cross validation to get a reasonable estimate of the expected prediction error.  For these problems, I'm asking you to compute two different metrics: misclassification rate with respect to the Bayes' classifer and the deviance - $-2 \times \sum \limits_{i = 1}^N \log P(\hat{y}_i = y_i)$.
+
+I think that the easiest way to compute these K-fold metrics is to program the split and evaluation yourself.  Using packages like `caret` limit the fit metrics that can be returned without significant additional work.  For R users, there's a really great package called `splitTools` that does the hard work of creating folds for you.  In this package, the function `create_folds` takes a vector of indices and returns a list with $K$ elements.  Each list element contains a vector of indices that correspond to that fold's **training data**.  The omitted indices correspond to that fold's **validation set**.  Once this list is created, you can loop over the list.  For example:
+
+```{r, include=TRUE, eval = FALSE}
+#Let data be a N x P data frame
+#Make a random matrix
+set.seed(12345)
+data <- as.data.frame(matrix(ncol = 100, nrow = 1000, rnorm(100000)))
+#Binary Outcome
+data$V100 <- round(runif(1000))
+folds <- splitTools::create_folds(seq(1,nrow(data)), k = 10, type = "basic")
+#Deviance and Misclass Prop holder
+kf_deviance <- c()
+kf_misclass <- c()
+for(i in 1:length(folds)){
+  #Compute logit model using all but holdouts
+  logit_mod <- glm(V100 ~ ., data = data[folds[[i]],], 
+                   family = binomial(link = "logit"))
+  #Predict holdouts
+  preds <- predict(logit_mod, newdata = data[-folds[[i]],], type = "response")
+  #Deviance
+  kf_deviance[i] <- -2*sum((data$V100[-folds[[i]]]*log(preds)) + ((1 - data$V100[-folds[[i]]])*(log(1 - preds))))
+  #Proportion Misclassified
+  kf_misclass[i] <- mean(round(preds) != data$V100[-folds[[i]]])
+}
+```
+
+
+
