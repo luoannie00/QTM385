@@ -28,6 +28,7 @@ library(data.table)
 library(tidyverse)
 library(glmnet)
 library(MASS)
+library(splitTools)
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
 
@@ -86,7 +87,7 @@ In a number of data sets, the predictors are a collection of ordered categorical
 The problem is that there is no in-between: we must either treat the predictor as an unordered outcome and lose any information that comes from seeing how the predictor increases or decreases while preserving its discreteness **or** treat the predictor as continuous preserving any ordering but losing its discrete nature.  Each choice comes with some downside, so we'll see how each one works on the training data set and use it to assess predictive accuracy on the test data set.
 
 ```{r}
-setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/#4')
+setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps4')
 cancer_train <- read.csv('cancerTrain.csv')
 cancer_test <- read.csv('cancerTest.csv')
 wine_train <- read.csv('wineTrain.csv')
@@ -231,6 +232,89 @@ Now, let's use the three models to create predictions for the test set and compa
 Under what conditions might we expect the unordered discrete model to perform better than the continuous predictor one?  Under what conditions might we expect the opposite to hold?
 
 Note: There is one big weakness of the discrete Bayes' theorem approach.  Briefly discuss this weakness and then skip any affected observations when computing the average loss.
+
+```{r}
+p2p3_misclass <- c()
+p2p3_deviance <- c()
+```
+
+```{r}
+cancer_test['pred_fromp1_prob'] <- NA
+cancer_test['pred_fromp1_binary'] <- NA
+misclass_count <- 0
+null_count <- 0
+
+for (x in 1:nrow(cancer_test)) {
+  i <- cancer_test[x,'UCellSize']
+  j <- cancer_test[x,'SECellSize']
+  if (is.na(p2p1_df1[i,j])) {
+    null_count <- null_count + 1
+    next
+  }
+  else {
+    cancer_test[x,'pred_fromp1_prob'] <- p2p1_df1[i,j]
+    cancer_test[x,'pred_fromp1_binary'] <- p2p1_df2[i,j]
+    if (cancer_test[x,'pred_fromp1_binary'] != cancer_test[x,'Malignant']) {
+      misclass_count <- misclass_count + 1
+    }
+  }
+}
+
+p2p3_misclass <- c(p2p3_misclass, 
+                   misclass_count/(nrow(cancer_test)-null_count))
+
+binary <- cancer_test$pred_fromp1_binary
+prob <- cancer_test$pred_fromp1_prob
+p2p3_deviance <- c(p2p3_deviance,
+                   -2 * sum((binary*log(prob)) + ((1-binary)*(log(1-prob))), na.rm=TRUE) )
+```
+
+```{r}
+cancer_test['pred_logistic_prob'] <- NA
+cancer_test['pred_logistic_binary'] <- NA
+
+misclass_count <- 0
+for (x in 1:nrow(cancer_test)) {
+  i <- cancer_test[x,'UCellSize']
+  j <- cancer_test[x,'SECellSize']
+  cancer_test[x,'pred_logistic_prob'] <- p2p2_df1[i,j]
+  cancer_test[x,'pred_logistic_binary'] <- p2p2_df2[i,j]
+  if (cancer_test[x,'pred_logistic_binary'] != cancer_test[x,'Malignant']) {
+    misclass_count <- misclass_count + 1
+  }
+}
+
+p2p3_misclass <- c(p2p3_misclass, misclass_count/(nrow(cancer_test)))
+
+binary <- cancer_test$pred_logistic_binary
+prob <- cancer_test$pred_logistic_prob
+p2p3_deviance <- c(p2p3_deviance,
+                   -2 * sum((binary*log(prob)) + ((1-binary)*(log(1-prob)))) )
+```
+
+```{r}
+cancer_test['pred_qda_prob'] <- NA
+cancer_test['pred_qda_binary'] <- NA
+
+misclass_count <- 0
+for (x in 1:nrow(cancer_test)) {
+  i <- cancer_test[x,'UCellSize']
+  j <- cancer_test[x,'SECellSize']
+  cancer_test[x,'pred_qda_prob'] <- p2p2_df3[i,j]
+  cancer_test[x,'pred_qda_binary'] <- p2p2_df4[i,j]
+  if (cancer_test[x,'pred_qda_binary'] != cancer_test[x,'Malignant']) {
+    misclass_count <- misclass_count + 1
+  }
+}
+
+p2p3_misclass <- c(p2p3_misclass, misclass_count/(nrow(cancer_test)))
+
+binary <- cancer_test$pred_qda_binary
+prob <- cancer_test$pred_qda_prob
+p2p3_deviance <- c(p2p3_deviance,
+                   -2 * sum(na.omit((binary*log(prob)) + ((1-binary)*(log(1-prob))))) )
+```
+
 
 ## Problem 3: Wine Data (40 points)
 
