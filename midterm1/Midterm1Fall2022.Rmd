@@ -32,11 +32,8 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 1
 ```
 
 ```{r}
-<<<<<<< Updated upstream
 #setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/midterm1')
-=======
-setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/midterm1')
->>>>>>> Stashed changes
+#setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/midterm1')
 #setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/midterm1')
 train_df <- read.csv('midterm1_train.csv')
 test_df <- read.csv('midterm1_testNoShares.csv')
@@ -288,7 +285,7 @@ According to the variable importance plot from above based on our optimal random
 
 ```{r}
 # take random sample data set for training & testing
-set.seed(77)
+set.seed(123)
 train_df_q4 <- train_df[sample(x=nrow(train_df), size=7500, replace=FALSE),]
 test_df_q4 <- train_df[sample(x=nrow(train_df), size=2500, replace=FALSE),]
 # log(share) transformation
