@@ -32,19 +32,20 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 1
 ```
 
 ```{r}
+<<<<<<< Updated upstream
 #setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/midterm1')
+=======
+setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/midterm1')
+>>>>>>> Stashed changes
 #setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/midterm1')
 train_df <- read.csv('midterm1_train.csv')
 test_df <- read.csv('midterm1_testNoShares.csv')
 ```
 
 Collaborators: Billy Ge, Latifa Tan, Annie Luo
+
 ## Question 1 - Implementing a Random Forest Model (10 pts.)
 ### Part 1
-```{r}
-#question - is it okay to further downsize the training set??? yess
-#question - drop url??? yess
-```
 
 ```{r}
 #sample training dataset
@@ -138,11 +139,6 @@ ggplot(data=pred_r) +
 
 
 ## Question 2 - Building a Big Predictive Model (25 pts.)
-```{r}
-#question - how to solve the collinearity problem??? do not use gam or subset selection
-#question - does GAM model have collinearity problem??? yess
-#question - how to find the optimal GAM model??? nooo
-```
 
 ```{r}
 #sample training dataset
@@ -171,7 +167,7 @@ mse(predict(p2_rf_m, data=stest_df_p2)$predictions, stest_df_p2$shares)
 ```
 
 ```{r}
-#According to problem 1 part 2, we can choose a subset of important variables to fit a GAM model.
+#According to problem 1 part 2, we can choose a subset of important variables to fit a GAM model, since the full predictor GAM model will lead to multicollinearity problem. Similarly, the full OLS linear regression model has the same problem. However, since the GAM model always has better performance over OLS linear regression model in terms of predictive accuracy, we decide not to try it.
 p1p2_df %>% arrange(desc(var_imp))
 p2_gam <- gam(data=strain_df_p2, family=gaussian(), 
               shares ~ s(kw_avg_avg)+s(kw_max_avg)+s(self_reference_avg_sharess))
@@ -211,6 +207,7 @@ mse(stest_df_p2$shares, predict(p2_optimal_ridgem, newx=data.matrix(stest_df_p2[
 ```
 
 ```{r}
+#The full predictor KNN model does not perform well here, which is probably caused by the curse of dimensionality problem.
 knn <- seq(5,1000,100)
 knn_mse_out <- c()
 
@@ -243,6 +240,21 @@ data.frame(model = p2_m,
 ```
 
 In addition, the lowest out of sample mse in the knn model is 0.79 when k equals around 100. But the random forest model clearly outperforms all four, with an OOB error of 0.7239764 and out of sample mse of 0.6875225. Hence, the random forest model with the number of variables considered for each bootstrap tree of 8 is our optimal model.
+
+```{r}
+p2_m <- c('random forest','GAM','LASSO','RIDGE','KNN')
+#manually calculated
+p2_runtime_seconds <- c(198,11,8,5,27)
+data.frame(p2_m,p2_runtime_seconds)
+```
+
+As shown in the table, the runtime in random forest (our optimal model) is the highest even though it is the best predictive model. KNN model ranks the second highest, whereas GAM, LASSO, and RIDGE models are relatively quick.
+
+```{r}
+p2_results <- data.frame(ID = test_df$ID, 
+                         p2_pred = predict(p2_rf_m, data=test_df)$predictions)
+write.csv(p2_results, file='Midterm1Q2_Predictions.csv', row.names=FALSE)
+```
 
   
 ## Question 3 - Interpreting Your Big Predictive Model (7 pts.)
