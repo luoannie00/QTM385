@@ -478,7 +478,7 @@ There are many confounding variables that we are unable to include in our model.
 ### Initial sampling and recoding
 ```{r}
 #sample training dataset
-set.seed(456)
+set.seed(787)
 sam_train_p6 <- as.numeric(sample(x=nrow(train_df), size=30000, replace=FALSE))
 sam_test_p6 <- setdiff(seq(1,35000,1), sam_train_p6)
 strain_df_p6 <- train_df[sam_train_p6,]
@@ -510,7 +510,6 @@ for (j in 1:59) {
     knn_mse_out_k <- c(knn_mse_out_k, mse(knn_model_k$pred, stest_df_p6$shares))
   }
   knn_p6_m <- knn.reg(train=as.data.frame(strain_df_p6[,j]), test=as.data.frame(stest_df_p6[,j]), y=as.data.frame(strain_df_p6[,60]), k=knn[which.min(knn_mse_out_k)])
-  optimalk<-c(optimalk,knn[which.min(knn_mse_out_k)])
   variableIndex<-c(variableIndex,j)
   knn_p6_mse_out <- c(knn_p6_mse_out,mse(knn_p6_m$pred, stest_df_p6$shares))
 }
@@ -520,33 +519,19 @@ optimalK_var_list<-data.frame(varIndex=variableIndex,optK=optimalk)
 #most ideal variable is kw_avg_avg based on out-of-sample EPE
 
 #in-sample using KCV
-knn_reg_kfold <- function(x, y, k, folds){
-  set.seed(456)
-  #sample
-  sam6_KNN_kfold_train <- as.numeric(sample(nrow(as.data.frame(x)), size=ceiling(nrow(as.data.frame(x))/folds), replace=FALSE))
-  sam6_KNN_kfold_test <- setdiff(seq(1,30000,1), sam6_KNN_kfold_train)
-  #model for prediction error
-  p6_p <- c()
-  for (i in 1:folds){
-    x_train <- x[sam6_KNN_kfold_train,]
-    x_test <- x[sam6_KNN_kfold_test,]
-    y_train <- y[sam6_KNN_kfold_train]
-    y_test <- y[sam6_KNN_kfold_test]
-    p6_KNN_kfoldm <- knn.reg(train = as.data.frame(x_train), test = as.data.frame(x_test), y = as.data.frame(y_train), k = k)
-    p6_p[i] <- mse(p6_KNN_kfoldm$pred, as.numeric(unlist(y_test)))
-  }
-  return(p6_p[1]/folds)
-}
-p6_kfold_5 <- c()
-p6_kfold_10 <- c()
+p6_knn_inMSE <- c()
 for (j in 1:59) {
   print(j)
-  p6_kfold_5[j] <- knn_reg_kfold(strain_df_p6[,j], strain_df_p6[,60], optimalk[j], 5)
-  p6_kfold_10[j] <- knn_reg_kfold(strain_df_p6[,j], strain_df_p6[,60], optimalk[j], 10)
+  knn_model_k <- knn.reg(train=as.data.frame(strain_df_p6[,j]),
+                         test=as.data.frame(strain_df_p6[,j]),
+                         y=as.data.frame(strain_df_p6[,60]),
+                         k=optimalk[j])
+  p6_knn_inMSE <- c(p6_knn_inMSE,mse(knn_model_k$pred,
+                                     strain_df_p6$shares))
 }
-p6_knn_in_df <- data.frame(var = colnames(strain_df_p6[,-60]), p6_kfold_5, p6_kfold_10)
-p6_knn_in_df %>% arrange(p6_kfold_5)
-p6_knn_in_df %>% arrange(p6_kfold_10)
+p6_knn_in_df <- data.frame(var = colnames(strain_df_p6[,-60]), p6_knn_inMSE)
+p6_knn_in_df %>% arrange(p6_knn_in_df)
+p6_knn_in_df %>% arrange(desc(p6_knn_inMSE))
 
 ```
 For KNN, we found that "kw_avg_avg" is a good uni-predictor for out-of-sample EPE, and "data_channel_is_world" is a good uni-predictor for in-sample EPE both for 5 and 10 fold CV. Since variables picked based on in-sample and out-of-sample EPE are very different, we will go with "kw_avg_avg" as other models all agree on "kw_avg_avg" being the best univariable.
