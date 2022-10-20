@@ -128,6 +128,8 @@ for (i in 1:10) {
     p2p1_df1[i,j] <- result_numerator/result_denominator
   }
 }
+
+p2p1_df1
 ```
 
 ```{r}
@@ -150,7 +152,13 @@ for (i in 1:10) {
     }
   }
 }
+
+p2p1_df2
 ```
+
+There are many classes that have probability of cancer occurrence of 1. They typically take place when both predictors have large values. Hence, the general relationship between the two predictors and the probability that a cell is cancerous is positive, meaning that the probability of cancer occurrence increases as the values of UCellSize and SECellSize increases.
+
+It does appear that we’ve missed some information by treating this problem in an unordered discrete fashion, because there are many NA entries in our probability lookup table. The given (UCellSize, SECellSize) pair has NA probability of cancer occurrence and NA Bayes' classifier when there is no such observation pair given the response variable is malignant in the training dataset.
 
 
 ### Part 2 (15 points)
@@ -177,6 +185,8 @@ for (i in 1:10) {
     p2p2_df1[i,j] <- temp[1,'logistic']
   }
 }
+
+p2p2_df1
 ```
 
 ```{r}
@@ -191,6 +201,8 @@ for (i in 1:10) {
     }
   }
 }
+
+p2p2_df2
 ```
 
 ```{r}
@@ -208,6 +220,8 @@ for (i in 1:10) {
     p2p2_df3[i,j] <- temp[1,'qda']
   }
 }
+
+p2p2_df3
 ```
 
 ```{r}
@@ -222,7 +236,11 @@ for (i in 1:10) {
     }
   }
 }
+
+p2p2_df4
 ```
+
+The main difference between tables in part 2 compared to those in part 1 is the NA entry. We don't see any NA entries in tables from part 2. By treating the predictors as continuous when they are truly discrete, it does not seem that we have lost anything. But, the decision boundaries in continuous logistic regression model and continuous qda model are very clean, whereas the decision boundary in the discrete model is more wiggly.
 
 
 ### Part 3 (10 points)
@@ -300,7 +318,12 @@ misclass_count <- 0
 for (x in 1:nrow(cancer_test)) {
   i <- cancer_test[x,'UCellSize']
   j <- cancer_test[x,'SECellSize']
-  cancer_test[x,'pred_qda_prob'] <- p2p2_df3[i,j]
+  if (p2p2_df3[i,j] == 1) {
+    cancer_test[x,'pred_qda_prob'] <- 1-1e-07
+  }
+  else {
+    cancer_test[x,'pred_qda_prob'] <- p2p2_df3[i,j]
+  }
   cancer_test[x,'pred_qda_binary'] <- p2p2_df4[i,j]
   if (cancer_test[x,'pred_qda_binary'] != cancer_test[x,'Malignant']) {
     misclass_count <- misclass_count + 1
@@ -312,8 +335,20 @@ p2p3_misclass <- c(p2p3_misclass, misclass_count/(nrow(cancer_test)))
 binary <- cancer_test$pred_qda_binary
 prob <- cancer_test$pred_qda_prob
 p2p3_deviance <- c(p2p3_deviance,
-                   -2 * sum(na.omit((binary*log(prob)) + ((1-binary)*(log(1-prob))))) )
+                   -2 * sum((binary*log(prob)) + ((1-binary)*(log(1-prob)))) )
 ```
+
+```{r}
+#conclusion
+p2p3_m <- c('discrete model','continuous logisitic model','continuous qda model')
+data.frame(p2p3_m, p2p3_misclass, p2p3_deviance)
+```
+
+In terms of the misclassification rate, all three models are similar. The discrete model has a larger value in misclassification rate because it has a smaller denominator in calculating the misclassification rate (due to removing the NA entries).
+
+In terms of deviance, the continuous qda model performs best, the discrete model ranks next, and the continuous logistic model is the worst.
+
+We expect the unordered discrete model to perform better than the ordered continuous models when there is not strong association between predictors. If that is the case, the probability distribution of predicting the response variable is very wiggly, where the decision boundary cannot be modeled by logistic or qda methods. Otherwise, it is not worth to apply the discrete model since its largest weakness is the NA entries when the training dataset is small.
 
 
 ## Problem 3: Wine Data (40 points)
