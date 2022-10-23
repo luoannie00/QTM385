@@ -80,6 +80,27 @@ when $A$ is symmetric.
 
 4. You'll have more luck with the second one if you differentiate with respect to $\Sigma^{-1}$ rather than $\Sigma$.
 
+## Problem 1 Solution
+$$
+\begin{eqnarray}
+\frac{\partial \ell \ell}{\partial \mu} &=& - \frac{1}{2} \sum \limits_{i = 1}^N [\frac{\partial(\boldsymbol x_i - \boldsymbol \mu )' \Sigma^{-1} (\boldsymbol{x}_i - \boldsymbol \mu)}{\partial \mu}]\\
+&=& - \frac{1}{2} \sum \limits_{i = 1}^N [2*\Sigma^{-1}*(\boldsymbol{x}_i - \boldsymbol \mu)*(-1)]\\
+&=& \sum \limits_{i = 1}^N \Sigma^{-1}*(\boldsymbol{x}_i - \boldsymbol \mu)\\
+0 &=& \Sigma^{-1}*\sum \limits_{i = 1}^N (\boldsymbol{x}_i - \boldsymbol \mu)\\
+\Sigma* 0 &=& \Sigma\Sigma^{-1}*\sum \limits_{i = 1}^N (\boldsymbol{x}_i - \boldsymbol \mu)\\
+0 &=& \sum \limits_{i = 1}^N (\boldsymbol{x}_i - \boldsymbol \mu)\\
+0 &=& \sum \limits_{i = 1}^N \boldsymbol{x}_i - N*\mu\\
+\hat{\mu} &=& \frac{1}{N} \sum \limits_{i = 1}^N \boldsymbol{x}_i
+\end{eqnarray}
+$$
+$$
+\begin{eqnarray}
+\frac{\partial \ell \ell}{\partial \Sigma^{-1}} &=& - \frac{N}{2}*[\frac{\partial \log \text{det}(\Sigma)}{\partial \Sigma^{-1}}] -\frac{1}{2} \sum \limits_{i = 1}^N [\frac{\partial (\boldsymbol x_i - \boldsymbol \mu )' \Sigma^{-1} (\boldsymbol{x}_i - \boldsymbol \mu)}{\partial \Sigma^{-1}}]\\
+&=& - \frac{N}{2}*\Sigma - \frac{1}{2} \sum \limits_{i = 1}^N[(\boldsymbol{x}_i - \boldsymbol \mu)(\boldsymbol{x}_i - \boldsymbol \mu)']\\
+\end{eqnarray}
+$$
+Since $\frac{d [\Sigma^{-1}]}{d\Sigma}$
+
 ## Problem 2: Cancer Data (40 Points)
 
 In a number of data sets, the predictors are a collection of ordered categorical ratings of objects.  These predictors are then used to classify objects into categories.  In class, we discussed plausibly continuous predictors (like income) and unordered categorical predictors (like manufacturing country).  However, we did not spend time discussing ordered categorical predictors.  This problem will see you work with two ordered categorical predictors - rating of uniformity of cell size (`UCellSize`: 1-10 with 10 being most irregular) and single epithelial cell size (`SECellSize`: 1-10 with 10 being largest) - trying to predict whether or not a cell is cancerous (`Malignant` is one if cancerous, 0 otherwise).
