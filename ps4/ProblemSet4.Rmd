@@ -29,6 +29,9 @@ library(tidyverse)
 library(glmnet)
 library(MASS)
 library(splitTools)
+library(naivebayes)
+library(nnet)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
 
@@ -374,18 +377,29 @@ We expect the unordered discrete model to perform better than the ordered contin
 
 ## Problem 3: Wine Data (40 points)
 
-The Wine data set is a classic prototyping data set for classification methods.  The data set revolves around a 13 different measurements of the chemical properties of different wines that originate from three different *cultivars* (varieties of plants - in this case, grapes - that have been produced by selective breeding).  The goal of the classification task is to create a classifier for the three different *cultivars* using only the chemical properties.
-
-The Wine data set only has 178 observations, so it is too small to split into training and test splits.  Therefore, cross-validation methods are needed to approximate expected prediction error.
-
 ### Part 1 (15 points)
-
-Let's start with only 2 predictors: Color and OD280.  Start by creating a plot that shows the predictor values in the training data colored by their class.  Can you see approximately where the decision boundaries should be?
-
-Using the training data, train a multinomial logistic regression classifier, a LDA classifier, a QDA classifier, and a Naive Bayes classifier assuming normal conditional marginals.  For each classifier, produce a plot that shows the Bayes' classifier as a function of Color and OD280 for the **minimum bounding box** implied by the predictors (which is just a fancy way of saying predict the class for many combinations of predictors within the minimum and maximum of each predictor).  How does the **decision boundary** differ between the 3 classifiers?  Which one appears to do the best at capturing the true decision boundary within the data?
-
-Hint: `Color` ranges from approximately 1 to 13 and `OD280` ranges from approximately 1 to 4.  There are a lot of approaches to creating the decision plots, but I think that doing a grid evaluation is easiest.
-
+#### show the predictors(color&OD280) values and approximate boundaries
+```{r}
+# yes, we could see some *clear boundaries between the three class, though there a exists some outlier points in each class.
+ggplot(data=wine_train,aes(x=Color, y= OD280,color=factor(Class)))+
+  geom_point()
+```
+#### Implementation of Classifiers
+```{r}
+# multinomial logistic regression classifier
+wine_train_factored<-wine_train
+wine_train_factored$Class<-factor(wine_train_factored$Class)
+multiLogistic_classifier<- multinom(Class ~ Color + OD280, data=wine_train_factored)
+# LDA classifier
+LDA_classifier<-lda(Class ~ Color + OD280, data=wine_train)
+# QDA classifier
+QDA_classifier<-qda(Class ~ Color + OD280, data=wine_train)
+# Naive Bayes classifier: Gaussian naive bayes
+# we won't apply KDE naive bayes here since the sample size is relatively small
+naiveBayes_x<-data.frame("color"=wine_train$Color,"OD280"=wine_train $OD280)
+naiveBayes_y<-as.character(wine_train$Class)
+naiveBayes_classifier<-naive_bayes(x=naiveBayes_x,y=naiveBayes_y,usekernel=FALSE)
+```
 ### Part 2 (15 points)
 
 Now, let's work with all 13 predictors.  The goal of this exercise is to build a model that best predicts out of sample wines, so use 10-fold cross validation to compute an estimate of the expected prediction error for three different classifiers - multinomial logistic regression, QDA, and naive Bayes with normal marginals.  For each classifier, compute the 10-fold estimate of the deviance **and** the misclassification rate with respect to the Bayes' classifier.
