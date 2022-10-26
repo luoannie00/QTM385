@@ -378,21 +378,25 @@ We expect the unordered discrete model to perform better than the ordered contin
 ## Problem 3: Wine Data (40 points)
 
 ### Part 1 (15 points)
+
 #### show the predictors(color&OD280) values and approximate boundaries
+
 ```{r}
 # yes, we could see some *clear boundaries between the three class, though there a exists some outlier points in each class.
 ggplot(data=wine_train,aes(x=Color, y= OD280,color=factor(Class)))+
   geom_point()
 ```
+
 #### Implementation of Classifiers
+
 ```{r}
-# multinomial logistic regression classifier
+# multinomial logistic regression 
 wine_train_factored<-wine_train
 wine_train_factored$Class<-factor(wine_train_factored$Class)
 multiLogistic_classifier<- multinom(Class ~ Color + OD280, data=wine_train_factored)
-# LDA classifier
+# LDA 
 LDA_classifier<-lda(Class ~ Color + OD280, data=wine_train)
-# QDA classifier
+# QDA 
 QDA_classifier<-qda(Class ~ Color + OD280, data=wine_train)
 # Naive Bayes classifier: Gaussian naive bayes
 # we won't apply KDE naive bayes here since the sample size is relatively small
@@ -400,6 +404,56 @@ naiveBayes_x<-data.frame("color"=wine_train$Color,"OD280"=wine_train $OD280)
 naiveBayes_y<-as.character(wine_train$Class)
 naiveBayes_classifier<-naive_bayes(x=naiveBayes_x,y=naiveBayes_y,usekernel=FALSE)
 ```
+
+#### grid evaluation for each classifier's prediction
+
+```{r}
+# grid evaluation preparation: 
+# build dataframe for full range Color[1:13] and OD280[1:4]
+test_color <- seq(1,13,0.05)
+test_OD280 <- seq(1,4,0.01)
+wine_test_df_pre <- expand.grid(test_color,test_OD280)
+wine_test_df<-data.frame("Color"=wine_test_df_pre$Var1,
+                         "OD280"=wine_test_df_pre$Var2)
+# prediction from based on each classifier
+# multinomial logistic regression 
+multiLogistic_pred<-data.frame("Color"=wine_test_df$Color,
+                               "OD280"=wine_test_df$OD280,
+  "predClass"=predict(multiLogistic_classifier, newdata =wine_test_df))
+ggplot(data=multiLogistic_pred,
+       aes(x=Color, y= OD280,color=factor(predClass)))+
+  geom_point()+
+  labs(title="multinomial logistic regression classifier")
+  
+# LDA
+LDA_classifier_pred<-data.frame("Color"=wine_test_df$Color,
+                                "OD280"=wine_test_df$OD280,
+                "predClass"=predict(LDA_classifier,wine_test_df)$class)
+ggplot(data=LDA_classifier_pred,
+       aes(x=Color, y= OD280,color=factor(predClass)))+
+  geom_point()+
+  labs(title="LDA classifier")
+
+# QDA
+QDA_classifier_pred<-data.frame("Color"=wine_test_df$Color,
+                                "OD280"=wine_test_df$OD280,
+        "predClass"=predict(QDA_classifier,wine_test_df)$class)
+ggplot(data=QDA_classifier_pred,
+       aes(x=Color, y= OD280,color=factor(predClass)))+
+  geom_point()+
+  labs(title="QDA classifier")
+
+# Naive Bayes classifier: Gaussian naive bayes
+naiveBayes_classifier_pred<-data.frame("Color"=wine_test_df$Color,
+                                "OD280"=wine_test_df$OD280,
+"predClass"=predict(naiveBayes_classifier, wine_test_df, type= "class"))
+#predict(naiveBayes_classifier, wine_test_df, type= "prob")
+ggplot(data=naiveBayes_classifier_pred,
+       aes(x=Color, y= OD280,color=factor(predClass)))+
+  geom_point()+
+  labs(title="naiveBayes classifier")
+```
+
 ### Part 2 (15 points)
 
 Now, let's work with all 13 predictors.  The goal of this exercise is to build a model that best predicts out of sample wines, so use 10-fold cross validation to compute an estimate of the expected prediction error for three different classifiers - multinomial logistic regression, QDA, and naive Bayes with normal marginals.  For each classifier, compute the 10-fold estimate of the deviance **and** the misclassification rate with respect to the Bayes' classifier.
