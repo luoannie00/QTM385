@@ -453,20 +453,6 @@ ggplot(data=naiveBayes_classifier_pred,
 ```
 
 ### Part 2 (15 points)
-#### Implementation of Classifiers for 13 predictors
-```{r}
-# multinomial logistic regression 
-multiLogistic_classifier<- multinom(Class ~ ., data=wine_train_factored)
-# LDA 
-LDA_classifier<-lda(Class ~ ., data=wine_train)
-# QDA 
-QDA_classifier<-qda(Class ~ ., data=wine_train)
-# Naive Bayes classifier: Gaussian naive bayes
-naiveBayes_x<-data.frame(wine_train[,-1])
-naiveBayes_y<-as.character(wine_train$Class)
-naiveBayes_classifier<-naive_bayes(x=naiveBayes_x,y=naiveBayes_y,usekernel=FALSE)
-```
-
 #### 10-fold estimate of the deviance and the miclassification rate
 ```{r}
 classifier_kfold_checker<-function(check){
