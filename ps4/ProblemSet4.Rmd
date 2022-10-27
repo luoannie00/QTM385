@@ -508,6 +508,10 @@ Broadly discuss situations where Naive Bayes is likely to outperform QDA.  Think
   - Consider the MLE for the multivariate normal you derived above - when do you think this computation would become time and/or computer space prohibitive?  For $P$ features, we have a $P \times P$ covariance matrix.  How many free parameters are there in this matrix?
   - What kind of assumption are we making about the marginal distribution of each feature using QDA (or LDA, even)?
   
+### Part 3 solution
+Both NB and QDA can be viewed as methods trying to maximize the log odds of posterior probability $\log( \frac{Pr(Y=k | X=x)}{Pr(Y=K | X=x)})$ with different assumptions. QDA relies on the multivariate normal density (MND) assumption where, for each class, the predictors are drawn from a multivariate normal density function. In other words, QDA assumes that the marginal distribution of predictors are normal. With this assumption, QDA models the log value in a quadratic way in the sense that it allows interaction of pairs of predictors. NB relies on the assumption of independence among predictors and thus doesn't allow interaction terms. NB models the log value in a generative additive way, and thus is more flexible. From a loss perspective, NB is likely to outperform QDA when the predictor dependencies are not very important in discriminating classes, as QDA has the advantage of capturing such dependencies but is not very flexible in functional forms, while NB is more flexible in an additive way but does not model any interactions among predictors.
+In the MLE calculated above with MND assumption required by QDA, we can see that the $\hat{\Sigma}$ is a matrix whose size is determined by the length of predictors vector. More specifically, $\hat{\Sigma}$ matrix is a $P \times P$ covariance matrix, where $P$ is the number of predictors. When $P$ gets too large, the computation of $\hat{\Sigma}$ can be very costly. Therefore, from a computational perspective, when there are too many predictors, NB is likely to outperform QDA.
+  
 ***
 
 ## Computational Resources
