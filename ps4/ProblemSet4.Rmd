@@ -378,19 +378,15 @@ We expect the unordered discrete model to perform better than the ordered contin
 
 
 ## Problem 3: Wine Data (40 points)
-
 ### Part 1 (15 points)
-
 #### show the predictors(color&OD280) values and approximate boundaries
-
 ```{r}
 # yes, we could see some *clear boundaries between the three class, though there a exists some outlier points in each class.
 ggplot(data=wine_train,aes(x=Color, y= OD280,color=factor(Class)))+
   geom_point()
 ```
 
-#### Implementation of Classifiers
-
+#### Implementation of Classifiers for Color and OD280
 ```{r}
 # multinomial logistic regression 
 wine_train_factored<-wine_train
@@ -404,11 +400,11 @@ QDA_classifier<-qda(Class ~ Color + OD280, data=wine_train)
 # we won't apply KDE naive bayes here since the sample size is relatively small
 naiveBayes_x<-data.frame("color"=wine_train$Color,"OD280"=wine_train $OD280)
 naiveBayes_y<-as.character(wine_train$Class)
-naiveBayes_classifier<-naive_bayes(x=naiveBayes_x,y=naiveBayes_y,usekernel=FALSE)
+naiveBayes_classifier_F<-naive_bayes(as.character(Class) ~ Color + OD280, data=wine_train,usekernel=FALSE)
+
 ```
 
 #### grid evaluation for each classifier's prediction
-
 ```{r}
 # grid evaluation preparation: 
 # build dataframe for full range Color[1:13] and OD280[1:4]
@@ -448,7 +444,7 @@ ggplot(data=QDA_classifier_pred,
 # Naive Bayes classifier: Gaussian naive bayes
 naiveBayes_classifier_pred<-data.frame("Color"=wine_test_df$Color,
                                 "OD280"=wine_test_df$OD280,
-"predClass"=predict(naiveBayes_classifier, wine_test_df, type= "class"))
+"predClass"=predict(naiveBayes_classifier_F, wine_test_df, type= "class"))
 #predict(naiveBayes_classifier, wine_test_df, type= "prob")
 ggplot(data=naiveBayes_classifier_pred,
        aes(x=Color, y= OD280,color=factor(predClass)))+
@@ -457,10 +453,67 @@ ggplot(data=naiveBayes_classifier_pred,
 ```
 
 ### Part 2 (15 points)
+#### Implementation of Classifiers for 13 predictors
+```{r}
+# multinomial logistic regression 
+multiLogistic_classifier<- multinom(Class ~ ., data=wine_train_factored)
+# LDA 
+LDA_classifier<-lda(Class ~ ., data=wine_train)
+# QDA 
+QDA_classifier<-qda(Class ~ ., data=wine_train)
+# Naive Bayes classifier: Gaussian naive bayes
+naiveBayes_x<-data.frame(wine_train[,-1])
+naiveBayes_y<-as.character(wine_train$Class)
+naiveBayes_classifier<-naive_bayes(x=naiveBayes_x,y=naiveBayes_y,usekernel=FALSE)
+```
 
-Now, let's work with all 13 predictors.  The goal of this exercise is to build a model that best predicts out of sample wines, so use 10-fold cross validation to compute an estimate of the expected prediction error for three different classifiers - multinomial logistic regression, QDA, and naive Bayes with normal marginals.  For each classifier, compute the 10-fold estimate of the deviance **and** the misclassification rate with respect to the Bayes' classifier.
-
-Which model performs best?  Worst?
+#### 10-fold estimate of the deviance and the miclassification rate
+```{r}
+classifier_kfold_checker<-function(check){
+  # data recode & prep
+  data<-wine_train # for other models
+  data$Class<-factor(data$Class)
+  # split wine_train randomly into 10-fold
+  set.seed(123)
+  folds <- create_folds(seq(1,nrow(data)), k = 10, type = "basic")
+  #Deviance and Misclass Prop holder
+  kf_deviance <- c()
+  kf_misclass <- c()
+  for(i in 1:length(folds)){
+    if (check == "multiLog"){
+      multiLogMod<- multinom(Class ~ ., data=data[folds[[i]],])
+      preds <- predict(multiLogMod, newdata =data[-folds[[i]],],type="probs")
+      preds_class <- predict(multiLogMod, newdata =data[-folds[[i]],],type="class")
+    }
+    else if(check == "LDA"){
+      LDA_classifier<-lda(Class ~ ., data=data[folds[[i]],])
+      preds <- predict(LDA_classifier,data[-folds[[i]],])$posterior
+    }
+    else if (check == "QDA"){
+      QDA_classifier<-qda(Class ~ ., data=data[folds[[i]],])
+      preds <- predict(QDA_classifier,data[-folds[[i]],])$posterior
+    }
+    else if (check == "NB"){
+      naiveBayes_classifier_F<-naive_bayes(as.character(Class) ~ . , data=data,usekernel=FALSE)
+      temp_test_pre<- data[-folds[[i]],]
+      temp_test<-data.frame(temp_test_pre[,-1])
+      preds <-predict(naiveBayes_classifier, temp_test, type= "prob")
+    }
+    #Deviance
+    kf_deviance[i] <- 
+      -2 * sum(log(rowSums(model.matrix( ~ 0 + data$Class[-folds[[i]]])*preds)))
+    #Proportion Misclassified
+    kf_misclass[i] <- mean(round(preds) != data$Class[-folds[[i]]])
+  }
+  return(c(mean(kf_deviance),mean(kf_misclass)))
+}
+multiLog<-classifier_kfold_checker("multiLog")
+LDA<-classifier_kfold_checker("LDA")
+QDA<-classifier_kfold_checker("QDA")
+NB<-classifier_kfold_checker("NB")
+result<-data.frame(model= c("multiLog","LDA","QDA","NB"),deviance=c(multiLog[1],LDA[1],QDA[1],NB[1]),
+                   misclass=c(multiLog[2],LDA[2],QDA[2],NB[2]))
+```
 
 ### Part 3 (10 points)
 
