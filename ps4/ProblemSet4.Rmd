@@ -4,7 +4,8 @@ title: 'Problem Set #4'
 author: "Kevin McAlister"
 date: "`r Sys.Date()`"
 output:
-  pdf_document:
+  html_document:
+    df_print: paged
     toc: no
     toc_depth: '2'
   prettydoc::html_pretty:
@@ -15,8 +16,7 @@ output:
     toc_depth: 2
     toc_float:
       collapsed: no
-  html_document:
-    df_print: paged
+  pdf_document:
     toc: no
     toc_depth: '2'
 urlcolor: blue
@@ -411,7 +411,7 @@ classifier_kfold_checker<-function(check){
       preds <- predict(QDA_classifier,data[-folds[[i]],])$posterior
     }
     else if (check == "NB"){
-      naiveBayes_classifier_F<-naive_bayes(as.character(Class) ~ . , data=data,usekernel=FALSE)
+      naiveBayes_classifier<-naive_bayes(as.character(Class) ~ . , data=data,usekernel=FALSE)
       temp_test_pre<- data[-folds[[i]],]
       temp_test<-data.frame(temp_test_pre[,-1])
       preds <-predict(naiveBayes_classifier, temp_test, type= "prob")
