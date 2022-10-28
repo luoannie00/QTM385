@@ -1730,21 +1730,17 @@ p2p1_df1</code></pre>
 <pre class="r"><code>p2p1_df2 &lt;- data.frame(matrix(nrow = 10, ncol = 10))
 
 for (i in 1:10) {
-  for (j in 1:10) {
-    if (is.na(p2p1_df1[i,j])) {
-      next
+    for (j in 1:10) {
+        if (is.na(p2p1_df1[i, j])) {
+            next
+        } else if (p2p1_df1[i, j] &gt; 0.5) {
+            p2p1_df2[i, j] &lt;- 1
+        } else if (p2p1_df1[i, j] &lt; 0.5) {
+            p2p1_df2[i, j] &lt;- 0
+        } else if (p2p1_df1[i, j] == 0.5) {
+            p2p1_df2[i, j] &lt;- 1
+        }
     }
-    else if (p2p1_df1[i,j] &gt; 0.5) {
-      p2p1_df2[i,j] &lt;- 1
-    }
-    else if (p2p1_df1[i,j] &lt; 0.5) {
-      p2p1_df2[i,j] &lt;- 0
-    }
-    #how to deal with it???
-    else if (p2p1_df1[i,j] == 0.5) {
-      p2p1_df2[i,j] &lt;- 1
-    }
-  }
 }
 
 p2p1_df2</code></pre>
@@ -2053,12 +2049,12 @@ ggplot(data = naiveBayes_classifier_pred, aes(x = Color, y = OD280,
 <h4>10-fold estimate of the deviance and the misclassification rate over
 all variables</h4>
 <p>The misclassification rates for all classifiers are quite close to
-one another, with native bayes have the misclassification rate a little
-bit higher than the others. From the deviance perspect, we could see
-that QDA performs the best here(with LDA have a bit higher deviance),
-while multinomial logistic regression classifier have a relatively huge
-deviance.[but also do notice that how the deviance enlarge the
-differences among the models]</p>
+one another(maybe they are slightly different if we have more decimal
+digits but they looks really the same with what we got here). From the
+deviance perspect, we could see that QDA performs the best here(with LDA
+have a bit higher deviance), while multinomial logistic regression
+classifier have a relatively huge deviance.[but also do notice that how
+the deviance enlarge the differences among the models]</p>
 <pre class="r"><code>classifier_kfold_checker &lt;- function(check) {
     # data recode &amp; prep
     data &lt;- wine_train  # for other models
