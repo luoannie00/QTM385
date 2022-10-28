@@ -2206,8 +2206,11 @@ dependencies but is not very flexible in functional forms, while NB is
 more flexible in an additive way but does not model any interactions
 among predictors. In the MLE calculated above with MND assumption
 required by QDA, we can see that the <span class="math inline">\(\hat{\Sigma}\)</span> is a matrix whose size is
-determined by the length of predictors vector. More specifically, <span class="math inline">\(\hat{\Sigma}\)</span> matrix is a <span class="math inline">\(P \times P\)</span> covariance matrix, where <span class="math inline">\(P\)</span> is the number of predictors. When <span class="math inline">\(P\)</span> gets too large, the computation of
-<span class="math inline">\(\hat{\Sigma}\)</span> can be very costly.
+determined by the length of predictors vector. More specifically, <span class="math inline">\(\hat{\Sigma}\)</span> matrix is a <span class="math inline">\(P \times P\)</span> covariance matrix, where <span class="math inline">\(P\)</span> is the number of predictors. Even
+though there are <span class="math inline">\(p \times
+\frac{P-1}{2}\)</span> free parameters due to symmatry of the
+variance-covariance matrix, when <span class="math inline">\(P\)</span>
+gets too large, the computation of <span class="math inline">\(\hat{\Sigma}\)</span> can still be very costly.
 Therefore, from a computational perspective, when there are too many
 predictors, NB is likely to outperform QDA.</p>
 </div>
