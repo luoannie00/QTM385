@@ -68,6 +68,22 @@ N*\Sigma &=& \sum \limits_{i = 1}^N[(\boldsymbol{x}_i - \boldsymbol \mu)(\boldsy
 $$
 
 ## Problem 2: Cancer Data (40 Points)
+<<<<<<< Updated upstream
+=======
+
+In a number of data sets, the predictors are a collection of ordered categorical ratings of objects.  These predictors are then used to classify objects into categories.  In class, we discussed plausibly continuous predictors (like income) and unordered categorical predictors (like manufacturing country).  However, we did not spend time discussing ordered categorical predictors.  This problem will see you work with two ordered categorical predictors - rating of uniformity of cell size (`UCellSize`: 1-10 with 10 being most irregular) and single epithelial cell size (`SECellSize`: 1-10 with 10 being largest) - trying to predict whether or not a cell is cancerous (`Malignant` is one if cancerous, 0 otherwise).
+
+The problem is that there is no in-between: we must either treat the predictor as an unordered outcome and lose any information that comes from seeing how the predictor increases or decreases while preserving its discreteness **or** treat the predictor as continuous preserving any ordering but losing its discrete nature.  Each choice comes with some downside, so we'll see how each one works on the training data set and use it to assess predictive accuracy on the test data set.
+
+```{r}
+#setwd('/Users/billyge/Desktop/Emory Fall 2022/QTM 385-4/problem sets/ps github/ps4')
+setwd('/Users/annie/Desktop/QTM385/QTM350_Github/QTM350 Github/QTM385/ps4')
+cancer_train <- read.csv('cancerTrain.csv')
+cancer_test <- read.csv('cancerTest.csv')
+wine_train <- read.csv('wineTrain.csv')
+```
+
+>>>>>>> Stashed changes
 ### Part 1 (15 points)
 ```{r}
 p2p1_df1 <- data.frame(matrix(nrow = 10, ncol = 10))
@@ -391,7 +407,11 @@ classifier_kfold_checker<-function(check){
   data<-wine_train # for other models
   data$Class<-factor(data$Class)
   # split wine_train randomly into 10-fold
+<<<<<<< Updated upstream
   set.seed(1234)
+=======
+  set.seed(1027)
+>>>>>>> Stashed changes
   folds <- create_folds(seq(1,nrow(data)), k = 10, type = "basic")
   #Deviance and Misclass Prop holder
   kf_deviance <- c()
@@ -435,4 +455,71 @@ result
 
 ### Part 3 
 Both NB and QDA can be viewed as methods trying to maximize the log odds of posterior probability $\log( \frac{Pr(Y=k | X=x)}{Pr(Y=K | X=x)})$ with different assumptions. QDA relies on the multivariate normal density (MND) assumption where, for each class, the predictors are drawn from a multivariate normal density function. In other words, QDA assumes that the marginal distribution of predictors are normal. With this assumption, QDA models the log value in a quadratic way in the sense that it allows interaction of pairs of predictors. NB relies on the assumption of independence among predictors and thus doesn't allow interaction terms. NB models the log value in a generative additive way, and thus is more flexible. From a loss perspective, NB is likely to outperform QDA when the predictor dependencies are not very important in discriminating classes, as QDA has the advantage of capturing such dependencies but is not very flexible in functional forms, while NB is more flexible in an additive way but does not model any interactions among predictors.
+<<<<<<< Updated upstream
 In the MLE calculated above with MND assumption required by QDA, we can see that the $\hat{\Sigma}$ is a matrix whose size is determined by the length of predictors vector. More specifically, $\hat{\Sigma}$ matrix is a $P \times P$ covariance matrix, where $P$ is the number of predictors. When $P$ gets too large, the computation of $\hat{\Sigma}$ can be very costly. Therefore, from a computational perspective, when there are too many predictors, NB is likely to outperform QDA.
+=======
+In the MLE calculated above with MND assumption required by QDA, we can see that the $\hat{\Sigma}$ is a matrix whose size is determined by the length of predictors vector. More specifically, $\hat{\Sigma}$ matrix is a $P \times P$ covariance matrix, where $P$ is the number of predictors. Even though there are $p \times \frac{P-1}{2}$ free parameters due to symmatry of the variance-covariance matrix, when $P$ gets too large, the computation of $\hat{\Sigma}$ can still be very costly. Therefore, from a computational perspective, when there are too many predictors, NB is likely to outperform QDA.
+  
+***
+
+## Computational Resources
+
+This problem set covers a number of different methods for creating classifiers.  Here, I'll discuss a few computational resources that will assist you when completing this problem set.
+
+### Logistic Regression
+
+In R, logistic regression is pretty easy to implement.  Here, we just use the `glm()` function included in base R.  For training logistic regression models, the only argument that makes the setup any different than standard linear models is `family = binomial(link = "logit")` which tells the function to compute the outcome using the logistic link function.
+
+When producing predictions using `glm()`, `predict` works in the same way as with `lm()`.  However, there is an additional argument, `type = `.  The default type of prediction is the `link` prediction which produces log-odds for a standard logistic regression model.  Setting `type = 'response'` returns the probability that the observation belongs to class 1.  You can get the probability that the observation belongs to class 0 by subtracting the returned probability from 1.
+
+### Multinomial Logistic Regression
+
+There are many implementations of multinomial logistic regression that all have similar flavors.  My preferred implementation is the `multinom()` function in the `nnet` package.  `multinom` functions much like `lm()` in that it allows you to use formula notation to implement your model (e.g. `y ~ ., data = df` to run a multinomial logistic regression on the response using all other variables as features).  The key difference here is that `y` **must be coded as a factor**.  You can convert the output to a factor by using `factor()`.  The regression will then run on the $K$-level factor.
+
+The coefficients for multinomial logistic regression models aren't all that meaningful, so we'll just talk about the predictions methods.  To create predictions using `multinom()`, you just use `predict()` as with `lm()`.  There are two types of predictions that can be produced - `type = 'class'` produces the class with the highest probability while `type = 'prob'` produces a matrix with $K$ columns that shows the predicted probability that each observation belongs to each class.  Using these probabilities, you can produce any error metrics you wish.
+
+### Quadratic Discriminant Analysis
+
+QDA can be implemented easily in R using the `qda()` function in the `MASS` package.  Again, QDA can be implemented using the familiar formula framework.  As with multinomial logistic regression, the response variable should be converted to a factor.
+
+QDA has a predict method that, by default, will return a list with two elements - the first is the class associated with the highest probability of occurrence and the second is a $K$ column matrix that includes the probabilities that the observation belongs to each class.
+
+### Naive Bayes
+
+There are lots of implementations of a naive Bayes' classifier in R.  My preferred implementation is `naive_bayes` in the `naivebayes` package.  Again, NB can be implemented using the standard formula language.  `y` should be coded as a factor (though this implementation accepts character vectors or logicals).  There is one argument which you might find useful in later applications of NB - `usekernel`.  The default argument of `usekernel = FALSE` assumes that any numeric features should be modeled using conditionally independent normal distributions.  If `usekernel = TRUE`, then the marginal distribution for each feature will be constructed using a kernel density estimator.  In theory, with large N, this would provide better estimates of the probability that we would see a value given the class label.  However, using KDE on small N data sets can lead to overfitting.
+
+NB's predict method closely mimics that of `multinom` in `nnet`.  There are two types: `class` which returns the class with the highest probability of occurrence and `prob` which returns a $K$-column matrix of probabilities that each observation belongs to each class.
+
+### K-Fold Cross Validation
+
+All of the classifiers used in the third question do not admit a clean AIC, BIC, or analytical formula for CV metrics.  Therefore, you'll need to use K-fold cross validation to get a reasonable estimate of the expected prediction error.  For these problems, I'm asking you to compute two different metrics: misclassification rate with respect to the Bayes' classifer and the deviance - $-2 \times \sum \limits_{i = 1}^N \log P(\hat{y}_i = y_i)$.
+
+I think that the easiest way to compute these K-fold metrics is to program the split and evaluation yourself.  Using packages like `caret` limit the fit metrics that can be returned without significant additional work.  For R users, there's a really great package called `splitTools` that does the hard work of creating folds for you.  In this package, the function `create_folds` takes a vector of indices and returns a list with $K$ elements.  Each list element contains a vector of indices that correspond to that fold's **training data**.  The omitted indices correspond to that fold's **validation set**.  Once this list is created, you can loop over the list.  For example:
+
+```{r, include=TRUE, eval = FALSE}
+#Let data be a N x P data frame
+#Make a random matrix
+set.seed(12345)
+data <- as.data.frame(matrix(ncol = 100, nrow = 1000, rnorm(100000)))
+#Binary Outcome
+data$V100 <- round(runif(1000))
+folds <- splitTools::create_folds(seq(1,nrow(data)), k = 10, type = "basic")
+#Deviance and Misclass Prop holder
+kf_deviance <- c()
+kf_misclass <- c()
+for(i in 1:length(folds)){
+  #Compute logit model using all but holdouts
+  logit_mod <- glm(V100 ~ ., data = data[folds[[i]],], 
+                   family = binomial(link = "logit"))
+  #Predict holdouts
+  preds <- predict(logit_mod, newdata = data[-folds[[i]],], type = "response")
+  #Deviance
+  kf_deviance[i] <- -2*sum((data$V100[-folds[[i]]]*log(preds)) + ((1 - data$V100[-folds[[i]]])*(log(1 - preds))))
+  #Proportion Misclassified
+  kf_misclass[i] <- mean(round(preds) != data$V100[-folds[[i]]])
+}
+```
+
+
+
+>>>>>>> Stashed changes
