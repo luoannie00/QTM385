@@ -1,0 +1,213 @@
+
+---
+title: 'Problem Set #5'
+author: "Kevin McAlister"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: no
+    toc_depth: '2'
+  prettydoc::html_pretty:
+    df_print: kable
+    highlight: github
+    theme: leonids
+    toc: no
+    toc_depth: 2
+    toc_float:
+      collapsed: no
+  html_document:
+    df_print: paged
+    toc: no
+    toc_depth: '2'
+urlcolor: blue
+---
+
+```{r, include=FALSE}
+library(ggplot2)
+library(data.table)
+library(kernlab)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
+```
+
+This is the fifth and final problem set for QTM 385 - Intro to Statistical Learning.  This homework will cover applied exercises related to support vector machines. 
+
+Please use the intro to RMarkdown posted in the Intro module and my .Rmd file as a guide for writing up your answers.  You can use any language you want, but I think that a number of the computational problems are easier in R.  Please post any questions about the content of this problem set or RMarkdown questions to the corresponding discussion board.
+
+Your final deliverable should be two files: 1) a .Rmd/.ipynb file and 2) either a rendered HTML file or a PDF.  Students can complete this assignment in groups of up to 3.  Please identify your collaborators at the top of your document.  All students should turn in a copy of the solutions, but your solutions can be identical to those of your collaborators.
+
+This assignment is due by Novermber 7th, 2022 at 11:59 PM EST.  
+
+***
+
+## Problem 1: An Unintuitive Result
+
+The support vector classifier generalizes the optimal separating hyperplane by allowing *slack variables* to handle cases where the points are misclassified (or within the margin).  A somewhat uninuitive result related to the support vector classifier arises when we have a two-class problem where the data is only *barely separable* - a SVC with a small cost that misclassifies a few data points may outperform an optimally separating hyperplane (with no points inside the margin, let alone misclassified) on out-of-sample data.  Let's show this via a simulated example.
+
+### Part 1
+
+`simSVMTrain.csv` contains 729 instances of two predictors and a binary class label.  In this simulated example, the classes are **linearly separable**.  However, they are generated from two separate data generating processes.  As shown in the below figure, the first DGP generates data that is separable with a large margin.  The second DGP generates data that is still linearly separable, but with less of a margin than the first.  This kind of conditional separating behavior is "exaggerated" in this data set, but it does occur quite frequently in real data sets when there is an important omitted predictor that conditions how classes are separated.
+
+```{r, include=TRUE, eval = TRUE}
+train <- fread("simSVMTrain.csv")
+par(mfrow = c(1,2))
+plot(train$X1,train$X2, col = train$class + 3, type = "n", xlab = "X1", ylab = "X2")
+points(train$X1[train$class == -1 & train$group == 1],train$X2[train$class == -1 & train$group == 1], pch = "+", col = "blue")
+points(train$X1[train$class == 1 & train$group == 1],train$X2[train$class == 1 & train$group == 1], pch = "+", col = "red")
+points(train$X1[train$class == -1 & train$group == 2],train$X2[train$class == -1 & train$group == 2], pch = "+", col = "green")
+points(train$X1[train$class == 1 & train$group == 2],train$X2[train$class == 1 & train$group == 2], pch = "+", col = "orange")
+plot(train$X1,train$X2, col = as.numeric(train$class) + 3, pch = "+", xlab = "X1", ylab = "X2")
+par(mfrow = c(1,1))
+```
+
+While it may not immediately appear to be the case in the combined data set, the classes are actually linearly separable!  Prove that this is true by 1) plotting the data and corresponding labels, 2) computing the optimal separating hyperplane and corresponding margins and plotting them against the data, and 3) showing that the **signed distance** from the hyperplane multiplied by the class label is greater than or equal to one for all observations in the data set. (Note: When you compute the signed distance, you may find that a few observations have a signed distance of .999---.  This can happen due to a combination of rounding and our approximation to the perfectly separable case with a finite cost.)
+
+Some hints:
+
+  1) We can use SVM software to get the separating hyperplane and margins in the perfectly separable case when we set `cost` to be very high.  `cost = 10000` should be sufficient.
+  
+  2) There's no need for a nonlinear kernel here since the decision boundary is linear.  Make sure to set the kernel to linear or vanilladot since most SVM software sets the kernel to radial/Gaussian by default.
+  
+  3) For the two predictor case, the separating hyperplane can be computed by finding all values of $\boldsymbol{x} \in \mathbb{R}^2$ such that $\hat{\alpha} + \hat{\beta}_1 x_1 + \hat{\beta}_2 x_2 = 0$.  Given the coefficients (which can usually be found using `coef()` or a similar argument in R or `svm.decision_function` in `sklearn`) and a value of $x_1$, we can uniquely compute $x_2$ that solves the equation.
+  
+  4) The predictors are already normalized, so don't worry about that here - this means that you don't need to rescale the coefficients by the vector norm, $\| \beta \|$.
+  
+  5) Since the SVM coefficients are normalized in the actual computation, we can compute the margins by finding values of $\boldsymbol{x}$ that solve $\hat{\alpha} + \hat{\beta}_1 x_1 + \hat{\beta}_2 x_2 = \pm 1$
+  
+  6) It is possible that all of the signed distances will be less than or equal to -1!  Because there is no real requirement that the SVC assigns $y = -1$ to be the negative distance class, we could just have everything reversed.  This is equivalent, so don't think that there's something wrong!
+  
+  7) I've written a lot of helpful stuff at the end of this problem set.  Check it out to get some clarity on how to approach the problem.
+
+  
+### Part 2
+
+Now, let's think about out of sample performance.  `simSVMTestF.csv` includes 200 observations that are generated using the same DGP used to generate the training data just with slightly different levels of occurrence for each group (feel free to verify this yourself!).    
+
+Using `cost = 10000`, compute the proportion of observations misclassified in the training set, a 5-fold cross validation measure of the expected proportion of observations misclassified in a test set, and the actual proportion of observations misclassified using the trained SVC to create predictions for the test set.  What do you see from these measures?  How can it be the case that data generated from the exact same process can yield training errors?  Think about the SVC and **overfitting**.
+
+Now repeat this process for 50 different values of `cost` ranging from very small to very large - a reasonable set of cost values can be generated using `exp(seq(-10,10,length = 50))` in R.   Make a plot that shows the training error, 10 fold CV estimate, and actual proportion of misclassified points in the test set plotted against the cost values.
+
+There's a decent amount of information to unpack from this graph!  
+
+  1) What value of cost returns the lowest proportion of misclassified points in the test set?  How does this cost value compare to the optimal separating hyperplane with minimal slackness?  Provide some reasoning for this result.
+  
+  2) Does the K-fold CV error estimate more closely correspond to the training error or the test error?  In a few sentences, provide some reasoning for this result.  Think very carefully about how cross validation would work for the SVC and why we might see this relationship - how does drawing the decision boundary for **support vector** classification differ from the other models we've discussed in class?
+  
+Note that your findings for this problem are most prevalent when the data are perfectly separable and this relationship tends to disappear as there is more crossover between classes.  This may seem like the most common scenario, but an SVM using the radial kernel is **guaranteed** to perfectly separate any training data in the two class problem so long as there are no two points with the same $\boldsymbol x_i$ that have different classes!  Just something to be wary of and why a combined $K$-fold and validation set approach is preferable to just using $K$-fold cross validation!
+
+## Problem 2: Some Data on Cars
+
+The data set `carsTrain.csv` contains data related to the overall fuel performance for a variety of cars.  The main outcome variable is `mpg` - this is coded as 1 if the car gets greater than 20 miles per gallon and is coded as 0 for all other MPGs.  There are 8 predictors with the country of origin being a set of two dummy coded variables indicating whether the car was produced in the U.S. or Europe.  Japanese cars were dropped from the data set as a base category.
+
+There is also a test set, `carsTest.csv`, that contains 92 observations that can be used to quantify out-of-sample predictive ability.
+
+Using all available predictors, compute classification models for the `mpg` variable using the training data and compare them in terms of out of sample predictive ability.  Use the following classification approaches:
+
+  1) Logistic regression
+  2) QDA
+  3) KNN Classifier
+  4) Support Vector Classifier w/ Linear Separator
+  5) Support Vector Machine w/ Polynomial Kernel
+  6) Support Vector Machine w/ Radial Kernel
+  7) Classification Random Forest
+  
+For the support vector machine implementations, you must tune the cost parameter - check at least 20 values of $C$ and choose the one that minimizes the 5-fold cross validation estimate of the expected prediction error.  For the kernelized SVMs, you may use the default parameters for the radial basis function.  However, for the polynomial kernel, tune the degree of the polynomial by checking both degree 2 and degree 3 polynomials.  For the random forests, tune the number of variables kept for each bagged tree by choosing the number between 2 and 8 that minimizes the out-of-bag error estimate of the expected prediction error.
+
+For each classification approach, use your final model to compute 1) the training misclassification rate, 2) a cross-validation estimate (or out-of-bag estimate for the tree) of the misclassification rate with respect to the Bayes' classifier for out of sample data, and 3) the misclassification rate for the held out test set.  Create a table that summarizes your results.
+
+Which method performs the best?  Worst?  Provide some intuition for this result.
+
+*Note*: This problem is here to give you a credible commitment mechanism for understanding how to implement a number of different classifiers in preparation for the classification midterm.  Use this as an opportunity to **read the documentation** for the different implementations of the new approaches to get comfortable with arguments in the functions.  Some functions have some nice convenience features that make predictive tuning easier!
+
+***
+
+## An intro to support vector machine software
+
+There are numerous implementations of SVM software in R and Python.  Here, I'm going to talk about my preferred SVM implementation in R: `ksvm` in the `kernlab` package.
+
+`ksvm` is a great implementation of the SVM algorithm that is used by most SVM implementations - `LIBSVM`.  The package is nice because it builds in a good guess as to the best value of the spread parameter for the RBF kernel.  It also has a number of good plotting functions, though it does not provide a pre-built method for computing the location of the decision boundary and margins for the linear SVM.  Rather, the native plot method uses a fast grid evaluation to provide the **signed distances** from the boundary.
+
+`ksvm` takes a formula that dictates the classification problem.  Since this function can be used for a lot of different support vector methods, you'll want to ensure that it is doing **support vector classification**.  You can ensure that it is treating the outcome as a categorical variable by setting `type = C-svc` in the function call.  
+
+The second argument you'll care about is the `kernel` argument.  Here, you can pass a specific kernel function to the SVM to *kernelize* the feature space.  For a linear classifier, you'll want to set `kernel = vanilladot` which tells the function to just leave everything as is.  For an RBF kernel, you'll want to set `kernel = rbfdot`.  For a polynomial kernel, you'll want to set `kernel = polydot`.
+
+For nonlinear kernels, there are hyperparameters that dictate the form of the kernel function.  One of the nice things about the `ksvm` function is that you do not need to set the `gamma` value for the RBF kernel.  Rather, it uses a heuristic to find a good value as a function of the input data.  In my experience, there is little reason to choose a different value.  For the polynomial kernel, you'll need to set the degree of the kernel.  Typically, only integer values are considered and the choice is between setting it to degree 2 or degree 3.  To set this, you'll need to add an argument to `ksvm` such that `kpar = list(degree = 2)` for a 2nd degree polynomial.
+
+To compute a K-fold CV measure of the expected misclassification rate on out of sample data, `ksvm` has a built in K-fold method.  To implement 5-fold cross validation and return an estimate of the expected misclassification rate, set `cross = 5` in the `ksvm` call.
+
+In some cases, you may want to also estimate the "probabilities" using the Briar-corrected logistic regression scores.  You can tell `ksvm` to do this by setting `prob.model = TRUE`.
+
+In many ways, the most important argument for the SVM is the cost parameter, `C`.  This is where most of the training action is.  The default is `C = 1`, but this is in no way optimal!  Unfortunately, `ksvm` has no built-in way to pass a vector of potential cost values to the function and you must train each model iteratively (like I said in class, a lot of people are okay with suboptimal performance...).  I recommend just creating a for loop that iterates over all considered values of `C` and captures the cross-validation estimate of EPE.  Example included below.
+
+Training a SVM can be very time consuming!  This is the cost of doing business with the SVM.  The workflow for training an SVM proceeds in the following manner:
+
+  1. Try all possible combinations of any kernel parameters and values of cost being considered.  Compute a K-fold cross validation estimate of the expected misclassification rate.
+  
+  2. Choose the values of `C` and any kernel parameters that minimize the rate of misclassification.
+  
+  3. Train a final SVM using the chosen parameters and use the build in predict methods to create new predictions.
+  
+An example workflow using a 3rd degree polynomial kernel:
+
+```{r, include=TRUE, eval = FALSE}
+library(kernlab)
+train <- fread("simSVMTrain.csv")
+test <- fread("simSVMTestF.csv")
+#Create a holder for the 5 fold CV estimate with Cost
+cross_ests <- c()
+#Create a vector of potential C values
+cost_vals <- exp(seq(-3,3,length = 20))
+#Now loop through this vector
+#This may take some time!
+for(i in 1:length(cost_vals)){
+  #Train the SVM
+  svm1 <- kernlab::ksvm(class ~ X1 + X2, data = train, type = "C-svc", kernel = "polydot", kpar = list(degree = 3), C = cost_vals[i], cross = 5, prob.model = TRUE)
+  #Extract the 5fold CV est and store
+  cross_ests[i] <- kernlab::cross(svm1)
+}
+#Set cost to the value that minimizes misclass rate
+cost <- cost_vals[which.min(cross_ests)]
+#Train the final model
+svm1 <- kernlab::ksvm(class ~ X1 + X2, data = train, kernel = "polydot", kpar = list(degree = 3), C = cost, type = "C-svc", cross = 5, prob.model = TRUE)
+#Make predictions
+#Class
+test_preds_class <- predict(svm1, newdata = test, type = "response")
+#Probability (if prob.model = TRUE)
+test_preds_prob <- predict(svm1, newdata = test, type = "probabilities")
+```
+
+Some additional notes:
+
+  1. `ksvm` natively handles multiclass problems.  There's a lot of stuff that happens under the hood, but nothing different is really needed here!  Remember, however, that for $K$ classes, we are calculating (more or less) ${K}\choose{2}$ SVMs!
+  
+  2. The choice of the cost can be really consequential.  You can further hone in on the "optimal" C by narrowing in the grid search.  Perhaps you can also find algorithms that choose C for you.  I don't know of anything, but maybe it's out there?
+  
+  3. Be warned that all implementations of the SVM struggle to scale when $N$ gets large!  When you must compute an SVM in large data settings, subset or use implementations that support GPU computing.
+  
+  
+For the first problem, you are asked to plot the decision boundary and the margins.  You're also going to compute the signed distances from the boundary to each point and show that they are all *almost* greater than or equal to 1.  To do this, you'll need to get the coefficients.  This can be a bit of a pain, but I'll walk you through the process.
+
+For some reason, SVM implementations sometimes refuse to return the actual coefficients!  `e1071` has an implementation of the SVM that returns coefficients, but its tuning approach is really obtuse and I don't like it very much.  Everything is just much cleaner in `kernlab`.
+
+If you must get the coefficients to make a plot, you'll have to do some work.  The easiest coefficient to get is the intercept - though it is frustratingly returned as the negative intercept.  For a `ksvm` object, you can get the negative intercept using the function `b(svm1)`.
+
+Unfortunately, the slope coefficients are not returned when we do `coef(svm1)`!  What actually gets returned is the **Lagrange multiplier times the training label** for the support vectors since they are the only ones that have non-zero multipliers.  These are the observations in the perfectly separable case that are exactly on the margins.  We know that:
+$$\boldsymbol \beta = \sum \limits_{i = 1}^N \lambda_i y_i \mathbf x_i$$
+So, if we knew which observations served as the support vectors, we could solve for $\boldsymbol \beta$.  Fortunately, we do - `alphaindex(svm1)` returns the rows of the observations in the training data that are support vectors!  Once we know those rows, we can then find the corresponding elements of the slope vector.  For the first training feature:
+$$\beta_1 = \sum \limits_{m} \lambda_m y_m x_{m,1}$$
+
+Once we have the vector of slope coefficients, we're almost home-free.  The final step is to figure out how to plot the line such that:
+$$\alpha + \mathbf X \boldsymbol \beta = 0$$
+to get the decision boundary and:
+$$\alpha + \mathbf X \boldsymbol \beta = \pm 1$$
+to get the margins since everything is nice and normalized under the hood.
+
+For the two feature case, let $Q$ be the right side of the above equalities.  Given a value for $x_1$, we can find the corresponding $x_2$ on the line as:
+$$\frac{Q - \alpha}{\beta_2} + -\frac{\beta_1}{\beta_2} x_1 = x_2$$
+which is simplified to the familiar slope-intercept form.
+
+Finally, the signed distances of any point to the decision boundary in the normalized space can be computed as:
+$$y_i(\alpha + \beta_1 x_{i1} + \beta_{i2})$$
+Since the classes are already coded as -1 and 1, you don't need to do any rescaling!
+
+
+If you get lost in the code here, see the suggested answer [here](https://stats.stackexchange.com/questions/5056/computing-the-decision-boundary-of-a-linear-svm-model) on StackOverflow. 
