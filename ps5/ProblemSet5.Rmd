@@ -26,9 +26,20 @@ urlcolor: blue
 library(ggplot2)
 library(data.table)
 library(kernlab)
+library(MASS)
+library(nnet)
+library(FNN)
+library(splitTools)
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
 
+```{r}
+# data read-in
+car_train <- read.csv('carsTrain.csv')
+car_test <- read.csv('carsTest.csv')
+svm_train <- read.csv('simSVMTrain.csv')
+svm_test<-read.csv("simSVMTestF.csv")
+```
 This is the fifth and final problem set for QTM 385 - Intro to Statistical Learning.  This homework will cover applied exercises related to support vector machines. 
 
 Please use the intro to RMarkdown posted in the Intro module and my .Rmd file as a guide for writing up your answers.  You can use any language you want, but I think that a number of the computational problems are easier in R.  Please post any questions about the content of this problem set or RMarkdown questions to the corresponding discussion board.
@@ -115,6 +126,104 @@ For the support vector machine implementations, you must tune the cost parameter
 For each classification approach, use your final model to compute 1) the training misclassification rate, 2) a cross-validation estimate (or out-of-bag estimate for the tree) of the misclassification rate with respect to the Bayes' classifier for out of sample data, and 3) the misclassification rate for the held out test set.  Create a table that summarizes your results.
 
 Which method performs the best?  Worst?  Provide some intuition for this result.
+```{r}
+#data_prep
+set.seed(1234)
+car_test_factored<-car_test
+car_test_factored$mpg<-factor(car_test$mpg)
+car_train_factored<-car_train
+car_train_factored$mpg<-factor(car_train$mpg)
+```
+
+### multinomial logistic regression 
+```{r}
+multiLogistic_classifier<- multinom(mpg ~ ., data=car_train_factored)
+# 1) training misclassification rate
+multiLog_pred<-predict(multiLogistic_classifier, newdata =car_train_factored)
+multiLog_train_ms<- mean(multiLog_pred != car_train_factored$mpg)
+# 2) k-fold cv misclassification rate
+folds <- create_folds(seq(1,nrow(car_train_factored)), k = 10, type = "basic")
+kf_misclass <- c()
+for(i in 1:length(folds)){
+  multiLogMod<- multinom(mpg ~ ., data=car_train_factored[folds[[i]],])
+  preds <- predict(multiLogMod, newdata =car_train_factored[-folds[[i]],])
+  #Proportion Misclassified
+  kf_misclass[i] <- mean(preds != car_train_factored[-folds[[i]],]$mpg)
+}
+multiLog_kfold_ms<-mean(kf_misclass)
+# 3) test set misclassification rate
+multiLog_pred<-predict(multiLogistic_classifier, newdata =car_test_factored)
+multiLog_test_ms<- mean(multiLog_pred != car_test_factored$mpg)
+```
+
+### QDA
+```{r}
+# QDA 
+QDA_classifier<-qda(mpg ~ ., data=car_train_factored)
+# 1) training misclassification rate
+QDA_pred<- predict(QDA_classifier,newdata=car_train_factored)$class
+QDA_train_ms<- mean(QDA_pred != car_train_factored$mpg)
+# 2) k-fold cv misclassification rate
+folds <- create_folds(seq(1,nrow(car_train_factored)), k = 10, type = "basic")
+kf_misclass <- c()
+for(i in 1:length(folds)){
+  QDAMod<- qda(mpg ~ ., data=car_train_factored[folds[[i]],])
+  preds <- predict(QDAMod, newdata =car_train_factored[-folds[[i]],])$class
+  #Proportion Misclassified
+  kf_misclass[i] <- mean(preds != car_train_factored[-folds[[i]],]$mpg)
+}
+QDA_kfold_ms<-mean(kf_misclass)
+# 3) test set misclassification rate
+QDA_pred<- predict(QDA_classifier,newdata=car_test_factored)$class
+QDA_test_ms<- mean(QDA_pred != car_test_factored$mpg)
+```
+
+### KNN
+```{r}
+# KNN
+# data prep
+car_train_x<- as.matrix(car_train[,-1])
+car_train_y<-car_train_factored$mpg
+car_test_x<- as.matrix(car_test[,-1])
+car_test_y<-car_test_factored$mpg
+# find the optimal k neighbor
+prob_cv_err<-c()
+misclass_cv_err<-c()
+k_test<- c(seq(1,200))
+for (i in 1:length(k_test)){
+  # TRUE for prob of misclassification
+  knn_classifier_temp<- knn.cv(train=car_train_x,cl=car_train_y,k=k_test[i],prob=TRUE)
+  # Misclass rate
+  misclass_cv_err[i] <- mean(knn_classifier_temp != car_train_y)
+  #Prob rate for binary output
+  probs <- attr(knn_classifier_temp, "prob")# return prob of misclassification
+  correct_class <- as.numeric(knn_classifier_temp == car_train_y)# 1 if the same
+  prob_correct <- (correct_class*probs) + ((1 - correct_class)*(1 - probs))
+  prob_cv_err[i] <- mean(1 - prob_correct)
+}
+plot(k_test, misclass_cv_err, type = "l", lwd = 3, xlab = "Number of Neighbors", ylab = "Loss")
+lines(k_test, prob_cv_err, col = "red", lwd = 3)
+legend("bottomright", c("Misclass","Prob. Incorrect"), col = c("black","red"), lwd = c(3,3))
+df<-data.frame(n=k_test,probError=prob_cv_err,misclassRate=misclass_cv_err)
+df[which.min(df$misclassRate),] # go with n=13
+# output
+knn_classifier<- knn.cv(train=car_train_x,cl=car_train_y,k=13,prob=TRUE)
+# 1) training misclassification rate
+knn_train_ms<-mean(knn_classifier != car_train_y) 
+# 2) k-fold cv misclassification rate
+folds <- create_folds(seq(1,nrow(car_train_factored)), k = 10, type = "basic")
+kf_misclass <- c()
+for(i in 1:length(folds)){
+  knnMod<- knn(train=car_train_factored[folds[[i]],][,-1],
+               test=car_train_factored[-folds[[i]],][,-1],
+               cl=car_train_factored[folds[[2]],]$mpg,k=13,prob=TRUE)
+  kf_misclass[i]<-mean(knnMod != car_train_factored[-folds[[i]],]$mpg)
+}
+knn_kfold_ms<-mean(kf_misclass)
+# 3) test set misclassification rate
+knn_test_Mod<- knn(train=car_train_x,test=car_test_x,cl=car_train_y,k=13)
+knn_test_ms<-mean(knn_test_Mod != car_test_y) 
+```
 
 *Note*: This problem is here to give you a credible commitment mechanism for understanding how to implement a number of different classifiers in preparation for the classification midterm.  Use this as an opportunity to **read the documentation** for the different implementations of the new approaches to get comfortable with arguments in the functions.  Some functions have some nice convenience features that make predictive tuning easier!
 
