@@ -24,6 +24,7 @@ urlcolor: blue
 
 ```{r, include=FALSE}
 library(ggplot2)
+library(tidyverse)
 library(data.table)
 library(kernlab)
 # add
@@ -57,15 +58,15 @@ The support vector classifier generalizes the optimal separating hyperplane by a
 `simSVMTrain.csv` contains 729 instances of two predictors and a binary class label.  In this simulated example, the classes are **linearly separable**.  However, they are generated from two separate data generating processes.  As shown in the below figure, the first DGP generates data that is separable with a large margin.  The second DGP generates data that is still linearly separable, but with less of a margin than the first.  This kind of conditional separating behavior is "exaggerated" in this data set, but it does occur quite frequently in real data sets when there is an important omitted predictor that conditions how classes are separated.
 
 ```{r, include=TRUE, eval = TRUE}
-train <- fread("simSVMTrain.csv")
-par(mfrow = c(1,2))
-plot(train$X1,train$X2, col = train$class + 3, type = "n", xlab = "X1", ylab = "X2")
-points(train$X1[train$class == -1 & train$group == 1],train$X2[train$class == -1 & train$group == 1], pch = "+", col = "blue")
-points(train$X1[train$class == 1 & train$group == 1],train$X2[train$class == 1 & train$group == 1], pch = "+", col = "red")
-points(train$X1[train$class == -1 & train$group == 2],train$X2[train$class == -1 & train$group == 2], pch = "+", col = "green")
-points(train$X1[train$class == 1 & train$group == 2],train$X2[train$class == 1 & train$group == 2], pch = "+", col = "orange")
-plot(train$X1,train$X2, col = as.numeric(train$class) + 3, pch = "+", xlab = "X1", ylab = "X2")
-par(mfrow = c(1,1))
+# train <- fread("simSVMTrain.csv")
+# par(mfrow = c(1,2))
+# plot(train$X1,train$X2, col = train$class + 3, type = "n", xlab = "X1", ylab = "X2")
+# points(train$X1[train$class == -1 & train$group == 1],train$X2[train$class == -1 & train$group == 1], pch = "+", col = "blue")
+# points(train$X1[train$class == 1 & train$group == 1],train$X2[train$class == 1 & train$group == 1], pch = "+", col = "red")
+# points(train$X1[train$class == -1 & train$group == 2],train$X2[train$class == -1 & train$group == 2], pch = "+", col = "green")
+# points(train$X1[train$class == 1 & train$group == 2],train$X2[train$class == 1 & train$group == 2], pch = "+", col = "orange")
+# plot(train$X1,train$X2, col = as.numeric(train$class) + 3, pch = "+", xlab = "X1", ylab = "X2")
+# par(mfrow = c(1,1))
 ```
 
 While it may not immediately appear to be the case in the combined data set, the classes are actually linearly separable!  Prove that this is true by 1) plotting the data and corresponding labels, 2) computing the optimal separating hyperplane and corresponding margins and plotting them against the data, and 3) showing that the **signed distance** from the hyperplane multiplied by the class label is greater than or equal to one for all observations in the data set. (Note: When you compute the signed distance, you may find that a few observations have a signed distance of .999---.  This can happen due to a combination of rounding and our approximation to the perfectly separable case with a finite cost.)
@@ -85,6 +86,46 @@ Some hints:
   6) It is possible that all of the signed distances will be less than or equal to -1!  Because there is no real requirement that the SVC assigns $y = -1$ to be the negative distance class, we could just have everything reversed.  This is equivalent, so don't think that there's something wrong!
   
   7) I've written a lot of helpful stuff at the end of this problem set.  Check it out to get some clarity on how to approach the problem.
+  
+
+```{r}
+svm_m1 <- ksvm(class ~ X1 + X2 , data = svm_train, type = "C-svc", kernel = "vanilladot", 
+               C = 10000, cross = 5, prob.model = TRUE)
+
+neg_intercept <- b(svm_m1)
+svobs <- svm_train[alphaindex(svm_m1)[[1]],] #support vector observations
+beta1 <- sum(svobs[,'X1']*coef(svm_m1)[[1]])
+beta2 <- sum(svobs[,'X2']*coef(svm_m1)[[1]])
+
+#decision boundary
+x1 <- c(0,0.2)
+x2 <- c((-neg_intercept)/beta2 - beta1/beta2*0, (-neg_intercept)/beta2 - beta1/beta2*0.2)
+p1p1_df1 <- data.frame(x1,x2)
+
+#supporting vector margins
+x1 <- c(0,0.2)
+x2 <- c((1-neg_intercept)/beta2 - beta1/beta2*0, (1-neg_intercept)/beta2 - beta1/beta2*0.2)
+p1p1_df2 <- data.frame(x1,x2)
+
+x1 <- c(0,0.2)
+x2 <- c((-1-neg_intercept)/beta2 - beta1/beta2*0, (-1-neg_intercept)/beta2 - beta1/beta2*0.2)
+p1p1_df3 <- data.frame(x1,x2)
+```
+
+```{r}
+reg_line1 <- lm(data=p1p1_df1, x2 ~ x1)
+reg_line2 <- lm(data=p1p1_df2, x2 ~ x1)
+reg_line3 <- lm(data=p1p1_df3, x2 ~ x1)
+plot(svm_train$X1,svm_train$X2, col = as.numeric(svm_train$class) + 3, pch = "+", xlab = "X1", ylab = "X2")
+abline(reg_line1, col='black')
+abline(reg_line2, col='green')
+abline(reg_line3, col='green')
+```
+
+```{r}
+svm_train$signed_dist <- svm_train$class*(-neg_intercept+beta1*svm_train$X1+beta2*svm_train$X2)
+svm_train %>% filter(signed_dist <= 1)
+```
 
   
 ### Part 2
@@ -103,6 +144,78 @@ There's a decent amount of information to unpack from this graph!
   
 Note that your findings for this problem are most prevalent when the data are perfectly separable and this relationship tends to disappear as there is more crossover between classes.  This may seem like the most common scenario, but an SVM using the radial kernel is **guaranteed** to perfectly separate any training data in the two class problem so long as there are no two points with the same $\boldsymbol x_i$ that have different classes!  Just something to be wary of and why a combined $K$-fold and validation set approach is preferable to just using $K$-fold cross validation!
 
+```{r}
+linearSVM_classfier <- ksvm(class ~ X1+X2, data = svm_train, type = "C-svc", kernel = "vanilladot", 
+             C = 10000, cross = 5, prob.model = TRUE)
+# 1) training misclassification rate
+train_preds_class <- predict(linearSVM_classfier, newdata = svm_train, type = "response")
+linearSVM_train_ms<- mean(train_preds_class != svm_train$class)
+# 2) k-fold cv misclassification rate
+folds <- create_folds(seq(1,nrow(svm_train)), k = 10, type = "basic")
+kf_misclass <- c()
+for(i in 1:length(folds)){
+  linearSVM_Mod <- ksvm(class ~ X1+X2 , data = svm_train[folds[[i]],], type = "C-svc", 
+                        kernel = "vanilladot",C = 10000, cross = 5, 
+                        prob.model = TRUE)
+  preds <- predict(linearSVM_Mod, newdata = svm_train[-folds[[i]],], 
+                              type = "response")
+  kf_misclass[i]<- mean(preds != svm_train[-folds[[i]],]$class)
+}
+linearSVM_kfold_ms<-mean(kf_misclass)
+# 3) test set misclassification rate
+test_preds_class <- predict(linearSVM_classfier, newdata = svm_test, type = "response")
+linearSVM_test_ms<- mean(test_preds_class != svm_test$class)
+#conclusion
+data.frame('name' = c('linearSVM_train_ms','linearSVM_kfold_ms','linearSVM_test_ms'),
+           'estimate' = c(linearSVM_train_ms,linearSVM_kfold_ms,linearSVM_test_ms))
+```
+
+```{r}
+train_ms <- c()
+kfold_ms <- c()
+test_ms <- c()
+#Create a vector of potential C values
+cost_vals <- exp(seq(-10,10,length = 50))
+for(i in 1:length(cost_vals)){
+  #Train the SVM
+  svm1 <- ksvm(class ~ X1+X2 , data = svm_train, type = "C-svc", kernel = "vanilladot", 
+                C = cost_vals[i], cross = 5, prob.model = TRUE, kpar = list())
+  # 1) training misclassification rate
+  train_preds_class <- predict(svm1, newdata = svm_train, type = "response")
+  train_ms[i] <- mean(train_preds_class != svm_train$class)
+  # 2) k-fold cv misclassification rate
+  folds <- create_folds(seq(1,nrow(svm_train)), k = 10, type = "basic")
+  kf_misclass <- c()
+  for(j in 1:length(folds)){
+    linearSVM_Mod <- ksvm(class ~ X1+X2 , data = svm_train[folds[[j]],], type = "C-svc", 
+                          kernel = "vanilladot",C = cost_vals[j], cross = 5, 
+                          prob.model = TRUE, kpar = list())
+    preds <- predict(linearSVM_Mod, newdata = svm_train[-folds[[j]],], 
+                                type = "response")
+    kf_misclass[j]<- mean(preds != svm_train[-folds[[j]],]$class)
+  }
+  kfold_ms[i] <- mean(kf_misclass)
+  # 3) test set misclassification rate
+  test_preds_class <- predict(svm1, newdata = svm_test, type = "response")
+  test_ms[i] <- mean(test_preds_class != svm_test$class)
+}
+```
+
+```{r}
+p1p2_df <- data.frame(cost_vals,train_ms,kfold_ms,test_ms)
+
+ggplot(data=p1p2_df) +
+  geom_line(aes(x=cost_vals,y=train_ms,col='train_ms')) +
+  geom_line(aes(x=cost_vals,y=kfold_ms,col='kfold_ms')) +
+  geom_line(aes(x=cost_vals,y=test_ms,col='test_ms')) +
+  scale_colour_manual(name="Legend",
+                      values=c("red","blue","green")) +
+  ylab('error estimates') +
+  theme_bw()
+```
+
+
+
 ## Problem 2: Some Data on Cars
 ```{r}
 #data_prep
@@ -115,7 +228,7 @@ car_train_factored$mpg<-factor(car_train$mpg)
 
 ### multinomial logistic regression 
 ```{r}
-multiLogistic_classifier<- multinom(mpg ~ ., data=car_train_factored)
+multiLogistic_classifier<- multinom(mpg ~ ., data=car_train_factored, trace=FALSE)
 # 1) training misclassification rate
 multiLog_pred<-predict(multiLogistic_classifier, newdata =car_train_factored)
 multiLog_train_ms<- mean(multiLog_pred != car_train_factored$mpg)
@@ -123,7 +236,7 @@ multiLog_train_ms<- mean(multiLog_pred != car_train_factored$mpg)
 folds <- create_folds(seq(1,nrow(car_train_factored)), k = 10, type = "basic")
 kf_misclass <- c()
 for(i in 1:length(folds)){
-  multiLogMod<- multinom(mpg ~ ., data=car_train_factored[folds[[i]],])
+  multiLogMod<- multinom(mpg ~ ., data=car_train_factored[folds[[i]],], trace=FALSE)
   preds <- predict(multiLogMod, newdata =car_train_factored[-folds[[i]],])
   #Proportion Misclassified
   kf_misclass[i] <- mean(preds != car_train_factored[-folds[[i]],]$mpg)
@@ -165,7 +278,7 @@ car_test_y<-car_test_factored$mpg
 # find the optimal k neighbor
 prob_cv_err<-c()
 misclass_cv_err<-c()
-k_test<- c(seq(1,200))
+k_test<- seq(1,200)
 for (i in 1:length(k_test)){
   # TRUE for prob of misclassification
   knn_classifier_temp<- knn.cv(train=car_train_x,cl=car_train_y,k=k_test[i],prob=TRUE)
@@ -212,7 +325,7 @@ cost_vals <- exp(seq(-3,3,length = 30))
 for(i in 1:length(cost_vals)){
   #Train the SVM
   svm1 <- ksvm(mpg ~ . , data = car_train_factored, type = "C-svc", kernel = "vanilladot", 
-                C = cost_vals[i], cross = 5, prob.model = TRUE)
+                C = cost_vals[i], cross = 5, prob.model = TRUE, kpar = list())
   #Extract the 5fold CV est and store
   temp_p2 <- kernlab::cross(svm1)
   if (temp_p2<optimal_epe){
@@ -222,7 +335,7 @@ for(i in 1:length(cost_vals)){
 }
 # finalized model
 linearSVM_classfier <- ksvm(mpg ~ . , data = car_train_factored, type = "C-svc", kernel = "vanilladot", 
-             C = optimal_cost, cross = 5, prob.model = TRUE)
+             C = optimal_cost, cross = 5, prob.model = TRUE, kpar = list())
 # 1) training misclassification rate
 train_preds_class <- predict(linearSVM_classfier, newdata = car_train_factored, type = "response")
 linearSVM_train_ms<- mean(train_preds_class != car_train_factored$mpg)
@@ -232,7 +345,7 @@ kf_misclass <- c()
 for(i in 1:length(folds)){
   linearSVM_Mod <- ksvm(mpg ~ . , data = car_train_factored[folds[[i]],], type = "C-svc", 
                         kernel = "vanilladot",C = optimal_cost, cross = 5, 
-                        prob.model = TRUE)
+                        prob.model = TRUE, kpar = list())
   preds <- predict(linearSVM_Mod, newdata = car_train_factored[-folds[[i]],], 
                               type = "response")
   kf_misclass[i]<- mean(preds != car_train_factored[-folds[[i]],]$mpg)
