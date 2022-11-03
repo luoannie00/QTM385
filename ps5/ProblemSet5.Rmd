@@ -124,7 +124,8 @@ abline(reg_line3, col='green')
 
 ```{r}
 svm_train$signed_dist <- svm_train$class*(-neg_intercept+beta1*svm_train$X1+beta2*svm_train$X2)
-svm_train %>% filter(signed_dist <= 1)
+svm_train %>% filter(signed_dist < 1)
+#while we see that there are three observations whose signed_dist is less than 1, all their values are around 0.9999, showing us that they would've been 1 had there been no rounding errors or approximating erros.
 ```
 
   
@@ -162,6 +163,18 @@ for(i in 1:length(folds)){
   kf_misclass[i]<- mean(preds != svm_train[-folds[[i]],]$class)
 }
 linearSVM_kfold_ms<-mean(kf_misclass)
+
+
+
+
+#?
+linearSVM_Mod <- ksvm(class ~ X1+X2 , data = svm_train, type = "C-svc", 
+                        kernel = "vanilladot",C = 10000, cross = 5, 
+                        prob.model = TRUE)
+cross(linearSVM_Mod) #0.004137931
+#
+
+
 # 3) test set misclassification rate
 test_preds_class <- predict(linearSVM_classfier, newdata = svm_test, type = "response")
 linearSVM_test_ms<- mean(test_preds_class != svm_test$class)
@@ -169,6 +182,8 @@ linearSVM_test_ms<- mean(test_preds_class != svm_test$class)
 data.frame('name' = c('linearSVM_train_ms','linearSVM_kfold_ms','linearSVM_test_ms'),
            'estimate' = c(linearSVM_train_ms,linearSVM_kfold_ms,linearSVM_test_ms))
 ```
+From the result table, we can see that the training dataset is perfectly separable, since as we set Cost to be extremely high, the misclassification rate in the training set is zero. Our linear model perfectly separates the classes. However, while we see a relatively low expected rate of misclassification, the actual misclassification rate was much higher than expected. Data coming from the same DGF can still yield training errors, because SVM does not rely on any assumptions of functional forms, and thus coming from the same function does not really help. (????) In addition, the zero misclassification rate on training set shows us that there may be overfitting happening, where the SVM picks up noise as signals, while noise in training data are not transferrable to test data.
+
 
 ```{r}
 train_ms <- c()
@@ -195,6 +210,12 @@ for(i in 1:length(cost_vals)){
     kf_misclass[j]<- mean(preds != svm_train[-folds[[j]],]$class)
   }
   kfold_ms[i] <- mean(kf_misclass)
+  
+  #?
+  #kfold_ms[i] <- cross(svm1) #上面这种方法kfoldEPE算出来比test大
+  #
+  
+  
   # 3) test set misclassification rate
   test_preds_class <- predict(svm1, newdata = svm_test, type = "response")
   test_ms[i] <- mean(test_preds_class != svm_test$class)
