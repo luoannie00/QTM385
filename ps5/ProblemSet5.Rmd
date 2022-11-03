@@ -168,10 +168,10 @@ linearSVM_kfold_ms<-mean(kf_misclass)
 
 
 #?
-linearSVM_Mod <- ksvm(class ~ X1+X2 , data = svm_train, type = "C-svc", 
-                        kernel = "vanilladot",C = 10000, cross = 5, 
-                        prob.model = TRUE)
-cross(linearSVM_Mod) #0.004137931
+#linearSVM_Mod <- ksvm(class ~ X1+X2 , data = svm_train, type = "C-svc", 
+                       # kernel = "vanilladot",C = 10000, cross = 5, 
+                      #  prob.model = TRUE)
+#cross(linearSVM_Mod) #0.004137931
 #
 
 
