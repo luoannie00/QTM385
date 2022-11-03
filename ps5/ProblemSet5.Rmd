@@ -99,16 +99,16 @@ beta2 <- sum(svobs[,'X2']*coef(svm_m1)[[1]])
 
 #decision boundary
 x1 <- c(0,0.2)
-x2 <- c((-neg_intercept)/beta2 - beta1/beta2*0, (-neg_intercept)/beta2 - beta1/beta2*0.2)
+x2 <- c((neg_intercept)/beta2 - beta1/beta2*0, (neg_intercept)/beta2 - beta1/beta2*0.2)
 p1p1_df1 <- data.frame(x1,x2)
 
 #supporting vector margins
 x1 <- c(0,0.2)
-x2 <- c((1-neg_intercept)/beta2 - beta1/beta2*0, (1-neg_intercept)/beta2 - beta1/beta2*0.2)
+x2 <- c((1+neg_intercept)/beta2 - beta1/beta2*0, (1+neg_intercept)/beta2 - beta1/beta2*0.2)
 p1p1_df2 <- data.frame(x1,x2)
 
 x1 <- c(0,0.2)
-x2 <- c((-1-neg_intercept)/beta2 - beta1/beta2*0, (-1-neg_intercept)/beta2 - beta1/beta2*0.2)
+x2 <- c((-1+neg_intercept)/beta2 - beta1/beta2*0, (-1+neg_intercept)/beta2 - beta1/beta2*0.2)
 p1p1_df3 <- data.frame(x1,x2)
 ```
 
