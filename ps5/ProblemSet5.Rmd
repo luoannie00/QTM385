@@ -163,18 +163,6 @@ for(i in 1:length(folds)){
   kf_misclass[i]<- mean(preds != svm_train[-folds[[i]],]$class)
 }
 linearSVM_kfold_ms<-mean(kf_misclass)
-
-
-
-
-#?
-#linearSVM_Mod <- ksvm(class ~ X1+X2 , data = svm_train, type = "C-svc", 
-                       # kernel = "vanilladot",C = 10000, cross = 5, 
-                      #  prob.model = TRUE)
-#cross(linearSVM_Mod) #0.004137931
-#
-
-
 # 3) test set misclassification rate
 test_preds_class <- predict(linearSVM_classfier, newdata = svm_test, type = "response")
 linearSVM_test_ms<- mean(test_preds_class != svm_test$class)
@@ -182,7 +170,7 @@ linearSVM_test_ms<- mean(test_preds_class != svm_test$class)
 data.frame('name' = c('linearSVM_train_ms','linearSVM_kfold_ms','linearSVM_test_ms'),
            'estimate' = c(linearSVM_train_ms,linearSVM_kfold_ms,linearSVM_test_ms))
 ```
-From the result table, we can see that the training dataset is perfectly separable, since as we set Cost to be extremely high, the misclassification rate in the training set is zero. Our linear model perfectly separates the classes. However, while we see a relatively low expected rate of misclassification, the actual misclassification rate was much higher than expected. Data coming from the same DGF can still yield training errors, because SVM does not rely on any assumptions of functional forms, and thus coming from the same function does not really help. (????) In addition, the zero misclassification rate on training set shows us that there may be overfitting happening, where the SVM picks up noise as signals, while noise in training data are not transferrable to test data.
+From the result table, we can see that the training dataset is perfectly separable, since as we set Cost to be extremely high, the misclassification rate in the training set is zero. Our linear model perfectly separates the classes in training data. However, while we see a relatively low expected rate of misclassification, the actual misclassification rate in test data was much higher than expected. This is largely due to overfitting with such a high Cost value. The zero misclassification rate on training set shows us that there the classifier may have been overfitted, where the SVM picks up noise as signals, while noise in training data are not transferrable to test data.
 
 
 ```{r}
@@ -203,19 +191,13 @@ for(i in 1:length(cost_vals)){
   kf_misclass <- c()
   for(j in 1:length(folds)){
     linearSVM_Mod <- ksvm(class ~ X1+X2 , data = svm_train[folds[[j]],], type = "C-svc", 
-                          kernel = "vanilladot",C = cost_vals[j], cross = 5, 
+                          kernel = "vanilladot",C = cost_vals[i], cross = 5, 
                           prob.model = TRUE, kpar = list())
     preds <- predict(linearSVM_Mod, newdata = svm_train[-folds[[j]],], 
                                 type = "response")
     kf_misclass[j]<- mean(preds != svm_train[-folds[[j]],]$class)
   }
   kfold_ms[i] <- mean(kf_misclass)
-  
-  #?
-  #kfold_ms[i] <- cross(svm1) #上面这种方法kfoldEPE算出来比test大
-  #
-  
-  
   # 3) test set misclassification rate
   test_preds_class <- predict(svm1, newdata = svm_test, type = "response")
   test_ms[i] <- mean(test_preds_class != svm_test$class)
@@ -224,7 +206,8 @@ for(i in 1:length(cost_vals)){
 
 ```{r}
 p1p2_df <- data.frame(cost_vals,train_ms,kfold_ms,test_ms)
-
+p1p2_df[which.min(train_ms),][1] #1902.683
+p1p2_df[which.min(test_ms),][1] #0.8153958	
 ggplot(data=p1p2_df) +
   geom_line(aes(x=cost_vals,y=train_ms,col='train_ms')) +
   geom_line(aes(x=cost_vals,y=kfold_ms,col='kfold_ms')) +
@@ -234,7 +217,9 @@ ggplot(data=p1p2_df) +
   ylab('error estimates') +
   theme_bw()
 ```
+1) In the test set, the value of cost with lowest error is 0.815. In the training set, the value of cost with lowest error is 1902. We can see that the training set prefers a high cost, which is much higher than what the test set prefers. This is not surprising because the training error being 0 signals overfitting, while a small cost gives a model more flexibility and thus generalizability. 
 
+2) Kfold CV error is much closer to training error than test error. This is because the SVM only chooses a few observations to be part of its support vectors, and those few observations are very likely to be in the training folds, therefore giving very similar models as the model created based on whole training set. And the "test" set that are not in the folds are likely not within the boundries and thus not misclassified, which makes cv error similar to 0, which is the training error in our perfectly separated case. However, the decision boundary and margins based on support vector found in training dataset are less likely to fit the real test set well, leading to much higher misclassification rates. In addition, our predicted variable, class, is a binary variable with only 1 or -1 values. This may cause our estimation of loss to be inaccurate.
 
 
 ## Problem 2: Some Data on Cars
