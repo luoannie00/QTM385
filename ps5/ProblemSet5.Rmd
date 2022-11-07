@@ -4,7 +4,8 @@ title: 'Problem Set #5'
 author: "Kevin McAlister"
 date: "`r Sys.Date()`"
 output:
-  pdf_document:
+  html_document:
+    df_print: paged
     toc: no
     toc_depth: '2'
   prettydoc::html_pretty:
@@ -15,8 +16,7 @@ output:
     toc_depth: 2
     toc_float:
       collapsed: no
-  html_document:
-    df_print: paged
+  pdf_document:
     toc: no
     toc_depth: '2'
 urlcolor: blue
