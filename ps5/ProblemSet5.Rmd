@@ -152,7 +152,7 @@ linearSVM_classfier <- ksvm(class ~ X1+X2, data = svm_train, type = "C-svc", ker
 train_preds_class <- predict(linearSVM_classfier, newdata = svm_train, type = "response")
 linearSVM_train_ms<- mean(train_preds_class != svm_train$class)
 # 2) k-fold cv misclassification rate
-folds <- create_folds(seq(1,nrow(svm_train)), k = 10, type = "basic")
+folds <- create_folds(seq(1,nrow(svm_train)), k = 5, type = "basic")
 kf_misclass <- c()
 for(i in 1:length(folds)){
   linearSVM_Mod <- ksvm(class ~ X1+X2 , data = svm_train[folds[[i]],], type = "C-svc", 
