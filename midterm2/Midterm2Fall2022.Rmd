@@ -29,7 +29,7 @@ library(splitTools)
 library(ranger)
 library(glmnet)
 library(naivebayes)
-rm(list = ls())
+#rm(list = ls())
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
 
@@ -127,6 +127,14 @@ Which pairs of digits will be easiest to tell apart? Which pairs will be most di
 
 Let's start with one of the digit pairs that is easiest to tell apart: 0s and 1s. For this question, we'll build a classifier to discriminate between images of 0s and images of 1s. Start by subsetting your training and validation data sets to only include 0s and 1s (a literal manifestation of the classification problem).
 
+## Question 2 Data
+```{r}
+p2_trainX <- train_x[1:5000,]
+p2_trainY <- train_y[1:5000,]
+p2_validX <- validation_x[1:3000,]
+p2_validY <- validation_y[1:3000,]
+```
+
 ### Part 1 (8 pts.)
 
 For reasons you will soon see, we'll only consider one classification approach for this problem - logistic regression. Using your training data, train a logistic regression classifier for the literal 0/1 problem. Compute an in-sample measure of expected prediction accuracy using the training data. Similarly, compute the accuracy of your trained logistic regression model on the validation set. What do you find here?
@@ -136,6 +144,78 @@ Intuitively, explain this result. Think carefully about the how logistic regress
 Plot up to 4 images in the validation set that are misclassified with respect to the Bayes' classifier. Does this misclassification make sense? What about these images leads the classifier to incorrectly guess the proper label?
 
 Note: the underlying algorithm for logistic regression proceeds iteratively attempting to minimize the logistic regression loss function. Because many of the predictors in this problem have variance close to zero, the default number of iterations (typically 25) may not be enough for the algorithm to converge. You can deal with this issue by setting the maximum number of IRLS iterations to a larger value - 100 should be sufficient. In R, this can be achieved within your `glm` call by adding an additional control argument - `control = list(maxit = 100)`.
+
+### Part 1 Solution
+```{r}
+#logistic regression model
+p2_train <- data.frame(p2_trainX, p2_trainY)
+p2p1_logistic <- glm(data=p2_train, 
+                     formula = p2_trainY ~ .,
+                     family = binomial(link='logit'),
+                     control = list(maxit = 100))
+#in-sample EPE
+folds <- create_folds(seq(1,nrow(p2_train)), k = 10, type = "basic")
+mis_rate <- c()
+for(i in 1:length(folds)){
+  countMs = 0
+  logistic_cv <- glm(p2_trainY ~ ., data=p2_train[folds[[i]],], trace=FALSE)
+  logistic_cv_pred <- predict(logistic_cv, newdata = p2_train[-folds[[i]],], type = "response")
+  #classify predictions
+  for (j in 1:length(logistic_cv_pred)){
+    if (logistic_cv_pred[j] > 0.5) {
+      logistic_cv_pred[j] <- 1
+    }
+    else {
+      logistic_cv_pred[j] <- 0
+    }
+  }
+  #Count of Misclassifications
+  for (k in 1:length(logistic_cv_pred)) {
+    if (logistic_cv_pred[k] != p2_train[-folds[[i]],]$p2_trainY[k]){
+      countMs = countMs + 1
+    }
+  }
+  mis_rate[i] <- countMs / length(logistic_cv_pred)
+}
+p2p1_epe<-mean(mis_rate)
+p2p1_epe #0.0036
+#oos
+countMs = 0
+logistic_valid <- predict(p2p1_logistic, newdata = p2_validX, type = "response")
+#classify predictions
+for (j in 1:length(logistic_valid)){
+  if (logistic_valid[j] > 0.5) {
+    logistic_valid[j] <- 1
+  }
+  else {
+    logistic_valid[j] <- 0
+  }
+}
+#Count of Misclassifications
+for (k in 1:length(logistic_valid)) {
+  if (logistic_valid[k] != p2_validY[k]){
+    print(k) #misclassified: 271, 1057, 2203, 2259, 2311, 2555
+    countMs = countMs + 1
+  }
+}
+p2p1_oos <- countMs / length(logistic_valid)
+p2p1_oos #0.002
+```
+The in-sample EPE and oos PE are both extremely small. Our model has great predictive capabilities.
+intuitive解释没写
+
+```{r}
+countMs #there are 6 misclassifications: 271, 1057, 2203, 2259, 2311, 2555
+validation_y[271,] #0
+plot_digit(x = validation_x[271,], bw = FALSE, main = "True Class = 0")
+validation_y[1057,] #0
+plot_digit(x = validation_x[1057,], bw = FALSE, main = "True Class = 0")
+validation_y[2203,] #1
+plot_digit(x = validation_x[2203,], bw = FALSE, main = "True Class = 1")
+validation_y[2311,] #1
+plot_digit(x = validation_x[2311,], bw = FALSE, main = "True Class = 1")
+```
+The misclassification does make sense, because the ones have a lot of white area around the middle vertical line (when x is 0.4-0.6), and zeros have a lot of gray area around the middle vertical line.
 
 ### Part 2 (7 pts.)
 
