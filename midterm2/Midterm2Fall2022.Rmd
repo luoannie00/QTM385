@@ -227,6 +227,47 @@ Leveraging this plot, come up with a set of rules related to the location of pen
 
 This task is, more or less, an example of **computer vision** - trying to use classification methods to make computer view images in the same way as humans.
 
+```{r}
+#LASSO
+p2p2_trainX <- data.matrix(p2_trainX)
+p2p2_trainY <- data.matrix(p2_trainY)
+#scientific lambda
+p2_cv_lasso <- cv.glmnet(x=p2p2_trainX, y=p2p2_trainY, family="binomial",
+                     control = list(maxit = 100), alpha=1, nfolds=10,
+                          type.measure="mse")
+#our chosen value of lambda is
+p2_cv_lasso$lambda.min
+p2_lasso <- glmnet(x=p2p2_trainX, y=p2p2_trainY, family="binomial", alpha=1,
+                            lambda=p2_cv_lasso$lambda.min)
+p2_lasso$beta #coefficients
+p2_corr <- c()
+for (i in 1:length(p2_lasso$beta)){
+  if (p2_lasso$beta[i] > 0) {
+    p2_corr[i] = 1
+  }
+  else if (p2_lasso$beta[i] < 0) {
+    p2_corr[i] = -1
+  }
+  else {
+    p2_corr[i] = 0
+  }
+}
+cf1 <- c()
+cf2 <- c()
+for (i in 1:59) {
+  cf1 <- append(cf1, rownames(p2_lasso$beta)[i])
+  cf2 <- append(cf2, unname(p2_lasso$beta)[i])
+}
+cf <- data.frame(cf1, cf2)
+ggplot(data=cf, aes(x=cf1, y=cf2)) +
+  geom_bar(stat="identity", width=0.75) + coord_flip() +
+  labs(x="Features", y="Coefficient Estimate") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.title.x = element_text(face="bold", colour="red", size = 12),
+        axis.title.y = element_text(face="bold", colour="red", size = 12))
+```
+
 ## Question 3 (25 pts.)
 
 Now, let's work with a more difficult pair - 4s and 9s. Logically, these are going to be more difficult to distinguish! Start by subsetting your training and validation sets to only include 4s and 9s. There may be some situations where you need to recode these to zeros and ones! When making predictions on the test set, be sure to recode the predictions back to 4s and 9s.
