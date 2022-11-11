@@ -202,7 +202,7 @@ p2p1_oos <- countMs / length(logistic_valid)
 p2p1_oos #0.002
 ```
 The in-sample EPE and oos PE are both extremely small. Our model has great predictive capabilities.
-intuitive解释没写
+intuitive解释没写(Logistic regression predicts probabilities between 0 and 1, which are exactly the two classes we're trying to predict here. So logistic regressions is a perfect choice here.)
 
 ```{r}
 countMs #there are 6 misclassifications: 271, 1057, 2203, 2259, 2311, 2555
@@ -227,6 +227,7 @@ Leveraging this plot, come up with a set of rules related to the location of pen
 
 This task is, more or less, an example of **computer vision** - trying to use classification methods to make computer view images in the same way as humans.
 
+### Part 2 Solution
 ```{r}
 #LASSO
 p2p2_trainX <- data.matrix(p2_trainX)
@@ -240,6 +241,7 @@ p2_cv_lasso$lambda.min
 p2_lasso <- glmnet(x=p2p2_trainX, y=p2p2_trainY, family="binomial", alpha=1,
                             lambda=p2_cv_lasso$lambda.min)
 p2_lasso$beta #coefficients
+#correlations
 p2_corr <- c()
 for (i in 1:length(p2_lasso$beta)){
   if (p2_lasso$beta[i] > 0) {
@@ -252,25 +254,23 @@ for (i in 1:length(p2_lasso$beta)){
     p2_corr[i] = 0
   }
 }
-cf1 <- c()
-cf2 <- c()
-for (i in 1:59) {
-  cf1 <- append(cf1, rownames(p2_lasso$beta)[i])
-  cf2 <- append(cf2, unname(p2_lasso$beta)[i])
-}
-cf <- data.frame(cf1, cf2)
-ggplot(data=cf, aes(x=cf1, y=cf2)) +
-  geom_bar(stat="identity", width=0.75) + coord_flip() +
-  labs(x="Features", y="Coefficient Estimate") +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5), 
-        axis.title.x = element_text(face="bold", colour="red", size = 12),
-        axis.title.y = element_text(face="bold", colour="red", size = 12))
+cf1 <- colnames(p2_trainX)
+names(p2_corr) <- cf1
+matrix(nrow = 12, ncol = 12, p2_corr, byrow = TRUE)
 ```
+As shown in the above matrix, where 1 represents a positive correlation, 0 non-important correlation, and -1 a negative correlation, we can see that the center has a positive correlation, meaning that the center being filled with pencil mark signals the class of one. There's also a 1 in [1,8], showing a pencil mark on the middle top signals the class of one. And there are -1 around the center, meaning marks there would decrease the probability of the number being classified as one, and therefore signals the class of zero.
 
 ## Question 3 (25 pts.)
 
 Now, let's work with a more difficult pair - 4s and 9s. Logically, these are going to be more difficult to distinguish! Start by subsetting your training and validation sets to only include 4s and 9s. There may be some situations where you need to recode these to zeros and ones! When making predictions on the test set, be sure to recode the predictions back to 4s and 9s.
+
+## Question 3 Data
+```{r}
+p3_trainX <- train_x[c(10001:12500, 22501:25000),]
+p3_trainY <- train_y[c(10001:12500, 22501:25000),]
+p3_validX <- validation_x[c(6001:7500, 13501:15000),]
+p3_validY <- validation_y[c(6001:7500, 13501:15000),]
+```
 
 ### Part 1 (5 pts.)
 
@@ -278,9 +278,112 @@ Start by replicating your analysis for 0s and 1s using logistic regression for 4
 
 Using the same LASSO approach as above, create a plot that shows which pixels are important for the classification. How does this image differ from the 0/1 case?
 
+### Part 1 Solution
+```{r}
+#recode for logistic regression
+length(p3_trainY)
+p3p1_trainY <- matrix(nrow = 5000, ncol = 1)
+p3p1_trainY[1:2500,] = 0 #4 -> 0
+p3p1_trainY[2501:5000,] = 1 #9 -> 1
+length(p3_validY)
+p3p1_validY <- matrix(nrow = 3000, ncol = 1)
+p3p1_validY[1:1500,] = 0 #4 -> 0
+p3p1_validY[1501:3000,] = 1 #9 -> 1
+#logistic regression model
+p3_logTrain <- data.frame(p3_trainX, p3p1_trainY)
+p3p1_logistic <- glm(data=p3_logTrain, 
+                     formula = p3p1_trainY ~ .,
+                     family = binomial(link='logit'),
+                     control = list(maxit = 100))
+#in-sample EPE
+folds <- create_folds(seq(1,nrow(p3_logTrain)), k = 10, type = "basic")
+mis_rate <- c()
+for(i in 1:length(folds)){
+  countMs = 0
+  logistic_cv <- glm(p3p1_trainY ~ ., data=p3_logTrain[folds[[i]],], trace=FALSE)
+  logistic_cv_pred <- predict(logistic_cv, newdata = p3_logTrain[-folds[[i]],], type = "response")
+  #classify predictions
+  for (j in 1:length(logistic_cv_pred)){
+    if (logistic_cv_pred[j] > 0.5) {
+      logistic_cv_pred[j] <- 1
+    }
+    else {
+      logistic_cv_pred[j] <- 0
+    }
+  }
+  #Count of Misclassifications
+  for (k in 1:length(logistic_cv_pred)) {
+    if (logistic_cv_pred[k] != p3_logTrain[-folds[[i]],]$p3p1_trainY[k]){
+      countMs = countMs + 1
+    }
+  }
+  mis_rate[i] <- countMs / length(logistic_cv_pred)
+}
+p3p1_epe<-mean(mis_rate)
+p3p1_epe #0.0508
+#oos
+countMs = 0
+logistic_valid <- predict(p3p1_logistic, newdata = p3_validX, type = "response")
+#classify predictions
+for (j in 1:length(logistic_valid)){
+  if (logistic_valid[j] > 0.5) {
+    logistic_valid[j] <- 1
+  }
+  else {
+    logistic_valid[j] <- 0
+  }
+}
+#Count of Misclassifications
+for (k in 1:length(logistic_valid)) {
+  if (logistic_valid[k] != p3p1_validY[k]){
+    countMs = countMs + 1
+  }
+}
+p3p1_oos <- countMs / length(logistic_valid)
+p3p1_oos #0.035
+```
+The four-nine classification's in-sample EPE is 0.0508, while oos EPE is 0.035. The EPE is ten times larger than zero-one classification. The results differ mainly because four and nine naturally look much similar than zero and one do.
+
+```{r}
+#LASSO
+p3_lTrainX <- data.matrix(p3_trainX)
+p3_lTrainY <- data.matrix(p3_trainY)
+#scientific lambda
+p3_cv_lasso <- cv.glmnet(x=p3_lTrainX, y=p3_lTrainY, family="binomial",
+                     control = list(maxit = 100), alpha=1, nfolds=10,
+                          type.measure="mse")
+#our chosen value of lambda is
+p3_cv_lasso$lambda.min
+p3_lasso <- glmnet(x=p3_lTrainX, y=p3_lTrainY, family="binomial", alpha=1,
+                            lambda=p3_cv_lasso$lambda.min)
+p3_lasso$beta #coefficients
+#correlations
+p3_corr <- c()
+for (i in 1:length(p3_lasso$beta)){
+  if (p3_lasso$beta[i] > 0) {
+    p3_corr[i] = 1
+  }
+  else if (p3_lasso$beta[i] < 0) {
+    p3_corr[i] = -1
+  }
+  else {
+    p3_corr[i] = 0
+  }
+}
+cf1 <- colnames(p3_trainX)
+names(p3_corr) <- cf1
+matrix(nrow = 12, ncol = 12, p3_corr, byrow = TRUE)
+```
+One big difference is that four-nine has much more important pixels for classification than zero-one. This conforms to our intuition that, because it's harder to tell four and nine apart, we need more features to predict the class. The upper center is concentrated with 1, signaling four. The lower center is full of -1, signaling nine.
+
 ### Part 2 (5 pts.)
 
 Compute QDA and Naive Bayes classifiers for the 4/9 problem. Compare their performance on the validation set to your logistic regression. What's going on here? Why do we see what we see? Think carefully about the assumptions under-the-hood for QDA, Naive Bayes, and logistic regression and the structure of the pixel data in the MNIST data set. You can apply the logic of your findings from this part to the rest of the assignment!
+
+### Part 2 Solution
+```{r}
+
+```
 
 ### Part 3 (10 pts.)
 
