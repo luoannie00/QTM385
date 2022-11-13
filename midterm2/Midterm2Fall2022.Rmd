@@ -29,7 +29,8 @@ library(splitTools)
 library(ranger)
 library(glmnet)
 library(naivebayes)
-rm(list = ls())
+library(mgcv)
+#rm(list = ls())
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
 
@@ -63,13 +64,6 @@ Collaborators: Billy Ge, Latifa Tan, Annie Luo
 
 
 ## Question 1 (15 pts.)
-
-Let's start by working with the training data to gain some comfort working with the MNIST data.
-
-### Part 1 (5 pts.)
-
-Create a plot that shows 9 random images in the training data. Label each image with its corresponding label. Do the images match the labels?
-
 ### Part 1 Solution
 ```{r}
 train_y[50,] #0
@@ -93,10 +87,6 @@ plot_digit(x = train_x[23730,], bw = FALSE, main = "True Class = 9")
 ```
 Yes the images match the labels.
 
-### Part 2 (5 pts.)
-
-For each digit (0 - 9), compute the average within class pixel value for each of the 144 pixels across the training data. Create a plot that shows the 10 average digits. Which class seems to show the most within class variation over images? Which class seems to the least within class variation over images?
-
 ### Part 2 Solution
 ```{r}
 mean_train <- matrix(nrow = 10, ncol = 144)
@@ -113,20 +103,11 @@ for (j in 1:10){
 解释还没写
 
 
-### Part 3 (5 pts.)
-
-Using the average images, come up with a measure of similarity or dissimilarity between different digits. It doesn't need to be particularly elegant.
-
-Which pairs of digits will be easiest to tell apart? Which pairs will be most difficult? Thinking about how people write different digits, does your similarity measure make sense?
-
 ### Part 3 Solution
 解释还没写
 
 
 ## Question 2 (15 pts.)
-
-Let's start with one of the digit pairs that is easiest to tell apart: 0s and 1s. For this question, we'll build a classifier to discriminate between images of 0s and images of 1s. Start by subsetting your training and validation data sets to only include 0s and 1s (a literal manifestation of the classification problem).
-
 ## Question 2 Data
 ```{r}
 p2_trainX <- train_x[1:5000,]
@@ -134,16 +115,6 @@ p2_trainY <- train_y[1:5000,]
 p2_validX <- validation_x[1:3000,]
 p2_validY <- validation_y[1:3000,]
 ```
-
-### Part 1 (8 pts.)
-
-For reasons you will soon see, we'll only consider one classification approach for this problem - logistic regression. Using your training data, train a logistic regression classifier for the literal 0/1 problem. Compute an in-sample measure of expected prediction accuracy using the training data. Similarly, compute the accuracy of your trained logistic regression model on the validation set. What do you find here?
-
-Intuitively, explain this result. Think carefully about the how logistic regression is approaching this classification problem.
-
-Plot up to 4 images in the validation set that are misclassified with respect to the Bayes' classifier. Does this misclassification make sense? What about these images leads the classifier to incorrectly guess the proper label?
-
-Note: the underlying algorithm for logistic regression proceeds iteratively attempting to minimize the logistic regression loss function. Because many of the predictors in this problem have variance close to zero, the default number of iterations (typically 25) may not be enough for the algorithm to converge. You can deal with this issue by setting the maximum number of IRLS iterations to a larger value - 100 should be sufficient. In R, this can be achieved within your `glm` call by adding an additional control argument - `control = list(maxit = 100)`.
 
 ### Part 1 Solution
 ```{r}
@@ -218,16 +189,6 @@ plot_digit(x = validation_x[2311,], bw = FALSE, main = "True Class = 1")
 ```
 The misclassification does make sense, because the ones have a lot of white area around the middle vertical line (when x is 0.4-0.6), and zeros have a lot of gray area around the middle vertical line.
 
-### Part 2 (7 pts.)
-
-Let's try to understand exactly how this classifier is working. For the training data, compute a logistic regression classifier with the LASSO penalty on the coefficients. Use K-fold CV to find a value of $\lambda$ that sparsely represents the set of coefficient and viably minimizes the expected misclassification rate for out of sample data.
-
-Using the coefficients associated with your chosen value of $\lambda$, create a plot that shows the relationship between the pixels and the coefficients. Positive coefficients are associated with pixels where a pencil pixel in that location (value \> 0) **increases** the predicted probability that the image is a 1 while negative coefficients are associated with pixels where a pencil pixel in that location (value \> 0) **decreases** the predicted probability that the image is a 1.
-
-Leveraging this plot, come up with a set of rules related to the location of pencil pixels that a human who had the pixel mappings could evaluate to determine if an image is a zero or one. The rules don't need to exactly relate to specific pixels. Rather, they can relate to relative location of the pixels (center vs. noncenter, for example).
-
-This task is, more or less, an example of **computer vision** - trying to use classification methods to make computer view images in the same way as humans.
-
 ### Part 2 Solution
 ```{r}
 #LASSO
@@ -262,9 +223,6 @@ matrix(nrow = 12, ncol = 12, p2_corr, byrow = TRUE)
 As shown in the above matrix, where 1 represents a positive correlation, 0 non-important correlation, and -1 a negative correlation, we can see that the center has a positive correlation, meaning that the center being filled with pencil mark signals the class of one. There's also a 1 in [1,8], showing a pencil mark on the middle top signals the class of one. And there are -1 around the center, meaning marks there would decrease the probability of the number being classified as one, and therefore signals the class of zero.
 
 ## Question 3 (25 pts.)
-
-Now, let's work with a more difficult pair - 4s and 9s. Logically, these are going to be more difficult to distinguish! Start by subsetting your training and validation sets to only include 4s and 9s. There may be some situations where you need to recode these to zeros and ones! When making predictions on the test set, be sure to recode the predictions back to 4s and 9s.
-
 ## Question 3 Data
 ```{r}
 p3_trainX <- train_x[c(10001:12500, 22501:25000),]
@@ -272,12 +230,6 @@ p3_trainY <- train_y[c(10001:12500, 22501:25000),]
 p3_validX <- validation_x[c(6001:7500, 13501:15000),]
 p3_validY <- validation_y[c(6001:7500, 13501:15000),]
 ```
-
-### Part 1 (5 pts.)
-
-Start by replicating your analysis for 0s and 1s using logistic regression for 4s and 9s. Compute an in-sample measure of expected prediction accuracy and find the misclassification rate for your validation set. How does this compare to the performance of logistic regression for 0s and 1s? Why do these results differ?
-
-Using the same LASSO approach as above, create a plot that shows which pixels are important for the classification. How does this image differ from the 0/1 case?
 
 ### Part 1 Solution
 ```{r}
@@ -378,10 +330,6 @@ matrix(nrow = 12, ncol = 12, p3_corr, byrow = TRUE)
 ```
 One big difference is that four-nine has much more important pixels for classification than zero-one. This conforms to our intuition that, because it's harder to tell four and nine apart, we need more features to predict the class. The upper center is concentrated with 1, signaling four. The lower center is full of -1, signaling nine.
 
-### Part 2 (5 pts.)
-
-Compute QDA and Naive Bayes classifiers for the 4/9 problem. Compare their performance on the validation set to your logistic regression. What's going on here? Why do we see what we see? Think carefully about the assumptions under-the-hood for QDA, Naive Bayes, and logistic regression and the structure of the pixel data in the MNIST data set. You can apply the logic of your findings from this part to the rest of the assignment!
-
 ### Part 2 Solution
 ```{r}
 p3_train <- data.frame(p3_trainX, p3_trainY)
@@ -416,7 +364,8 @@ For your chosen method, explain **why** it outperforms all other approaches. Thi
 Finally, present at least 4 examples of misclassified images. Could we ever expect a classification algorithm to get those images correct?
 
 ### Part 3 Solution
-We have used Logistic Regression, QDA, and NB w/ KDE for continuous margins. As explained above, we will not use NB without KDE due to high dimensionality. Since there are only two classes--four and nine, we won't be using Multinomial logistic regression. We will first continue our prediction with the lasso model we built before. Then, we will go back to NB and treat four and nine as discrete variables. Finally, we will build new models using LDA, generalized additive LR, Bayes' Theorem, 
+We have used Logistic Regression, QDA, and NB w/ KDE for continuous predictors. As explained above, we will not use NB without KDE due to high dimensionality. Since there are only two classes--four and nine, we won't be using Multinomial logistic regression. We also won't be using KNN due to the curse of high dimentionality. We also won't be treating predictors as discrete for NB, since the variables are values on a gray scale which are continuous. For the same reason, we also won't be using Bayes' Theorem for discrete features.
+We will first continue our prediction with the lasso model we built before. Then, we will build new models using LDA, generalized additive LR, linearSVM, polySVM, radialSVM, and Random Forest (bagged trees, probability trees, boosted trees). We attempted the GAM for Logistic Regression, but since it's too computational expensive to try tensor ti() to capture interactions for all combinations, we decided to not continue using GAM for LR. We believe we didn't loose much info for not trying this method, since we already tried generalized methods of LDA and QDA (which captures interactions between different combinations of two variables).
 ```{r}
 #lasso
 p3_lvalidX <- as.matrix(p3_validX)
@@ -425,6 +374,105 @@ FN_lasso_oos <- mean(FN_lasso != p3_validY)
 FN_lasso_oos #0.03233333
 fourNine_result$lasso <- FN_lasso_oos
 
+#LDA
+FN_LDA_classifier <- lda(p3_trainY ~ ., data=p3_train)
+FN_LDA <- predict(FN_LDA_classifier,p3_validX)$class
+FN_LDA_oos <- mean(FN_LDA != p3_validY)
+fourNine_result$LDA <- FN_LDA_oos 
+#we can see that LDA performs slightly better than QDA, so we believe that LDA is appropriate in the Four-Nine problem, where QDA has a little less precision. This is not surprising because we expected very unclean cuts as Four and Nine look very similar.
+
+#Generalized Additive LR
+#write all Xvariables in spline
+#form <- as.formula(paste("p3p1_trainY~",paste("s(",names(p3_trainX),")",collapse="+")))
+#FN_GAM <- gam(formula = form, data = p3_logTrain, family = binomial(link = 'logit'))
+
+#SVM data prep
+p3_trainYfactored <- factor(p3_trainY)
+p3_trainFactored <- data.frame(p3_trainX, p3_trainYfactored)
+p3_validYfactored <- factor(p3_validY)
+p3_validFactored <- data.frame(p3_validX, p3_validYfactored)
+
+#linearSVM
+# to find optimal cost and degree
+optimal_cost<-0
+optimal_degree<-0
+optimal_epe<-1000000
+#Create a vector of potential C values. We set our cost in an exponential way so that the cost we try won't be too high that the model overfits, and there are more cost values between 0 and 1 that we would try. This is because we expect the optimal cost value to fall between 0 and 1 for good generalizability, and we want to test carefully which cost value exactly would be the optimal value through CV. This tuning method applies to linearSVM, polySVM, and radialSVM.
+cost_vals <- exp(seq(-3,3,length = 30))
+for(i in 1:length(cost_vals)){
+  #Train the SVM
+  svm1 <- ksvm(p3_trainYfactored ~ . , data = p3_trainFactored, type = "C-svc", kernel = "vanilladot", 
+                C = cost_vals[i], cross = 5, prob.model = TRUE, kpar = list())
+  #Extract the 5fold CV est and store
+  temp_p3 <- kernlab::cross(svm1)
+  if (temp_p3<optimal_epe){
+    optimal_epe<-temp_p3
+    optimal_cost<-cost_vals[i]
+  }
+}
+# finalized model
+FN_linearSVM_classfier <- ksvm(p3_trainYfactored ~ . , data = p3_trainFactored, type = "C-svc", 
+                               kernel = "vanilladot", C = optimal_cost, cross = 5, prob.model = TRUE, 
+                               kpar = list())
+FN_linearSVM <- predict(FN_linearSVM_classfier, newdata = p3_validFactored , type = "response")
+FN_linearSVM_oos<- mean(FN_linearSVM != p3_validYfactored)
+fourNine_result$linearSVM <- FN_linearSVM_oos
+
+#polySVM
+# to find optimal cost and degree
+optimal_cost<-0
+optimal_degree<-0
+optimal_epe<-1000000
+#Create a vector of potential C values
+cost_vals <- exp(seq(-3,3,length = 30))
+for (j in 2:3){ #conventionally 2nd or 3rd degree polynomial would be enough
+  for(i in 1:length(cost_vals)){
+    #Train the SVM
+    svm2 <- ksvm(p3_trainYfactored ~ . , data = p3_trainFactored, type = "C-svc", kernel = "polydot", 
+                 kpar = list(degree = j), C = cost_vals[i], cross = 5, prob.model = TRUE)
+    #Extract the 5fold CV est and store
+    temp_p3 <- kernlab::cross(svm2)
+    if (temp_p3<optimal_epe){
+      optimal_epe<-temp_p3
+      optimal_cost<-cost_vals[i]
+      optimal_degree<-j
+    }
+  }
+}
+# finalized model
+FN_polySVM_classfier <- ksvm(p3_trainYfactored ~ . , data = p3_trainFactored, type = "C-svc", 
+                             kernel = "polydot", kpar = list(degree = optimal_degree), C = optimal_cost,
+                             cross = 5, prob.model = TRUE)
+FN_polySVM <- predict(FN_polySVM_classfier, newdata = p3_validFactored , type = "response")
+FN_polySVM_oos<- mean(FN_polySVM != p3_validYfactored)
+fourNine_result$polySVM <- FN_polySVM_oos
+
+#radialSVM
+# to find optimal cost
+optimal_cost<-0
+optimal_degree<-0
+optimal_epe<-1000000
+#Create a vector of potential C values
+cost_vals <- exp(seq(-3,3,length = 30))
+for(i in 1:length(cost_vals)){
+  #Train the SVM
+  svm3 <- ksvm(p3_trainYfactored ~ . , data = p3_trainFactored, type = "C-svc", kernel = "rbfdot", 
+                C = cost_vals[i], cross = 5, prob.model = TRUE)
+  #Extract the 5fold CV est and store
+  temp_p3 <- kernlab::cross(svm3)
+  if (temp_p3<optimal_epe){
+    optimal_epe<-temp_p3
+    optimal_cost<-cost_vals[i]
+  }
+}
+# finalized model
+FN_radialSVM_classfier <- ksvm(p3_trainYfactored ~ . , data = p3_trainFactored, type = "C-svc", 
+                            kernel = "rbfdot", C = optimal_cost, cross = 5, prob.model = TRUE)
+FN_radialSVM <- predict(FN_radialSVM_classfier, newdata = p3_validFactored , type = "response")
+FN_radialSVM_oos<- mean(FN_radialSVM != p3_validYfactored)
+fourNine_result$radialSVM <- FN_radialSVM_oos
+
+#tree methods
 ```
 
 ### Part 4 (5 pts.)

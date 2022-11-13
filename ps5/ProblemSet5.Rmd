@@ -258,7 +258,6 @@ multiLog_test_ms<- mean(multiLog_pred != car_test_factored$mpg)
 QDA_classifier<-qda(mpg ~ ., data=car_train_factored)
 # 1) training misclassification rate
 QDA_pred<- predict(QDA_classifier,newdata=car_train_factored)$class
-QDA_train_ms<- mean(QDA_pred != car_train_factored$mpg)
 # 2) k-fold cv misclassification rate
 folds <- create_folds(seq(1,nrow(car_train_factored)), k = 10, type = "basic")
 kf_misclass <- c()
