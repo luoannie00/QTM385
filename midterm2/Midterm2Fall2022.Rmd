@@ -29,7 +29,7 @@ library(splitTools)
 library(ranger)
 library(glmnet)
 library(naivebayes)
-#rm(list = ls())
+rm(list = ls())
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
 
@@ -200,6 +200,7 @@ for (k in 1:length(logistic_valid)) {
 }
 p2p1_oos <- countMs / length(logistic_valid)
 p2p1_oos #0.002
+zeroOne_result <- data.frame("In Sample" = p2p1_epe, "OOS" = p2p1_oos)
 ```
 The in-sample EPE and oos PE are both extremely small. Our model has great predictive capabilities.
 intuitive解释没写(Logistic regression predicts probabilities between 0 and 1, which are exactly the two classes we're trying to predict here. So logistic regressions is a perfect choice here.)
@@ -320,7 +321,7 @@ for(i in 1:length(folds)){
   mis_rate[i] <- countMs / length(logistic_cv_pred)
 }
 p3p1_epe<-mean(mis_rate)
-p3p1_epe #0.0508
+p3p1_epe #approx. 0.0508; numerically unstable
 #oos
 countMs = 0
 logistic_valid <- predict(p3p1_logistic, newdata = p3_validX, type = "response")
@@ -341,6 +342,7 @@ for (k in 1:length(logistic_valid)) {
 }
 p3p1_oos <- countMs / length(logistic_valid)
 p3p1_oos #0.035
+fourNine_result <- data.frame("Logistic" = p3p1_oos)
 ```
 The four-nine classification's in-sample EPE is 0.0508, while oos EPE is 0.035. The EPE is ten times larger than zero-one classification. The results differ mainly because four and nine naturally look much similar than zero and one do.
 
@@ -382,8 +384,24 @@ Compute QDA and Naive Bayes classifiers for the 4/9 problem. Compare their perfo
 
 ### Part 2 Solution
 ```{r}
-
+p3_train <- data.frame(p3_trainX, p3_trainY)
+p3_valid <- data.frame(p3_validX, p3_validY)
+# QDA 
+FN_QDA_classifier <- qda(p3_trainY ~ ., data=p3_train)
+FN_QDA <- predict(FN_QDA_classifier,p3_valid)$class
+FN_QDA_oos <- mean(FN_QDA != p3_valid$p3_validY)
+FN_QDA_oos #0.06533333
+fourNine_result$QDA <- FN_QDA_oos
+# Naive Bayes classifier: KDE naive bayes
+#we use KDE since data was high dimensional and has a lot of obs.
+FN_naiveBayes_classifier<-naive_bayes(as.character(p3_train$p3_trainY) ~ ., data=p3_train, usekernel=TRUE)
+FN_naiveBayes <- predict(FN_naiveBayes_classifier, p3_valid, type= "class")
+FN_naiveBayes_oos <- mean(FN_naiveBayes != p3_valid$p3_validY)
+FN_naiveBayes_oos #0.16
+fourNine_result$NaiveBayes <- FN_naiveBayes_oos
+fourNine_result
 ```
+We can see that logistic regression has the best performance, while NB has the worst. It makes sense that NaiveBayes does not perform very well, since when one pixel has pencil marks, it's likely that the pixels around it are marked too, which violates the independence assumption required by NB. QDA relies on the multivariate normal density (MND) assumption where, for each class, the predictors are drawn from a multivariate normal density function. In other words, QDA assumes that the marginal distribution of predictors are normal. With this assumption, QDA models $\log( \frac{Pr(Y=k | X=x)}{Pr(Y=K | X=x)})$ in a quadratic way in the sense that it allows interaction of pairs of predictors. It makes sense that it outperforms NB due to high correlation between pixels.  Logistic regression maps probabilities from 0 to 1. 解释没写完(assumpt of LR & why LR is the best)
 
 ### Part 3 (10 pts.)
 
@@ -396,6 +414,18 @@ You do not need to run all possible classification methods to get full credit fo
 For your chosen method, explain **why** it outperforms all other approaches. Think carefully about strengths and weaknesses.
 
 Finally, present at least 4 examples of misclassified images. Could we ever expect a classification algorithm to get those images correct?
+
+### Part 3 Solution
+We have used Logistic Regression, QDA, and NB w/ KDE for continuous margins. As explained above, we will not use NB without KDE due to high dimensionality. Since there are only two classes--four and nine, we won't be using Multinomial logistic regression. We will first continue our prediction with the lasso model we built before. Then, we will go back to NB and treat four and nine as discrete variables. Finally, we will build new models using LDA, generalized additive LR, Bayes' Theorem, 
+```{r}
+#lasso
+p3_lvalidX <- as.matrix(p3_validX)
+FN_lasso <- predict(p3_lasso, p3_lvalidX, type= "class")
+FN_lasso_oos <- mean(FN_lasso != p3_validY)
+FN_lasso_oos #0.03233333
+fourNine_result$lasso <- FN_lasso_oos
+
+```
 
 ### Part 4 (5 pts.)
 
