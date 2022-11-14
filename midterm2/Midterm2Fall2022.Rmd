@@ -473,6 +473,7 @@ FN_radialSVM_oos<- mean(FN_radialSVM != p3_validYfactored)
 fourNine_result$radialSVM <- FN_radialSVM_oos
 
 #tree methods
+
 ```
 
 ### Part 4 (5 pts.)
@@ -486,6 +487,14 @@ $$5 \times \frac{E_i}{E_{max}}$$
 ## Question 4 (25 pts.)
 
 Now, let's work with **three classes** - 3s, 5s, and 8s. Start by subsetting your training and validation sets to only include 3s, 5s and 8s.
+
+## Question 4 Data
+```{r}
+p4_trainX <- train_x[c(7501:10000, 12501:15000, 20001:22500),]
+p4_trainY <- train_y[c(7501:10000, 12501:15000, 20001:22500),]
+p4_validX <- validation_x[c(4501:6000, 7501:9000, 12001:13500),]
+p4_validY <- validation_y[c(4501:6000, 7501:9000, 12001:13500),]
+```
 
 ### Part 1 (25 pts.)
 
@@ -517,7 +526,59 @@ Notes:
   
   7. I'm really eager to see your approaches here - this is a weird problem that requires a lot of thought.  But, I think that this is a good demonstration of how you might use the approaches we discussed in class to address atypical classification problems.
 
-
+### Part 1 Solution
+From the observation of shoe pictures, we found that a commonality is that the 12th column has dark marks (most of them have all 12 rows filled at 12th column). The 3s, 5s, and 8s, however, are not likely to have the whole or most of 12th column filled. So we picked three points at the 12th column after transforming all observations to 12x12 matrices and tune a grayscale value to find as many shoes as possible for the first step.
+```{r}
+shoes <- c()
+for (i in 1:7500){
+  p4_trainMatrix <- matrix(nrow = 12, ncol = 12, p4_trainX[i,], byrow = TRUE)
+  if (p4_trainMatrix[6,12] > 5 && p4_trainMatrix[4,12] > 5 && p4_trainMatrix[8,12] > 5) {
+    shoes <- append(shoes, i)
+  }
+}
+for (i in 1:length(shoes)){
+  plot_digit(x = p4_trainX[shoes[i],], bw = FALSE)
+}
+```
+Now that we have found 18 shoes, we then matched those pictures with the ones given on the problem set, and we figured out the 2 shoes that are to be found. It makes sense that our previous method failed to identify those two since their 12th column, and more importantly, the middle part of the 12th column, was not oencil-marked. Again, we studied the characteristics of the 2 shoe pictures that are most different from number digits. For one shoe, both its upper-right corner and lower-left corner seem to be marked, which should be rare for digits. So let's try this condition.
+```{r}
+obs <- c()
+for (i in 1:7500){
+  p4_trainMatrix <- matrix(nrow = 12, ncol = 12, p4_trainX[i,], byrow = TRUE)
+  if (p4_trainMatrix[1,12] > 100 && p4_trainMatrix[12,1] > 100) {
+    obs <- append(obs, i)
+  }
+}
+for (i in 1:length(obs)){
+  plot_digit(x = p4_trainX[obs[i],], bw = FALSE)
+}
+obs
+```
+After plotting, we see that 1244th obs is the shoe we wanted to find. We append this shoe to our shoes list.
+```{r}
+shoes <- append(1244, shoes)
+```
+Now we only have one shoe left to find. We observe that its middle-left and two points on the right are marked. We reasoned that those three points may be more likely to be filled for digits too, so we start by setting a high value for grey-scale value.
+```{r}
+obs <- c()
+for (i in 1:7500){
+  p4_trainMatrix <- matrix(nrow = 12, ncol = 12, p4_trainX[i,], byrow = TRUE)
+  if (p4_trainMatrix[6,1] > 50 && p4_trainMatrix[4,12] > 50 && p4_trainMatrix[7,12] > 50) {
+    obs <- append(obs, i)
+  }
+}
+for (i in 1:length(obs)){
+  plot_digit(x = p4_trainX[obs[i],], bw = FALSE)
+}
+obs
+```
+Looking at the pictures, we see that the second plot is the final shoe we wanted, which is the 2190th obs.
+```{r}
+shoes <- append(2190, shoes)
+for (i in 1:length(shoes)){
+  plot_digit(x = p4_trainX[shoes[i],], bw = FALSE)
+}
+```
 
 ## Question 5 (20 pts.)
 
