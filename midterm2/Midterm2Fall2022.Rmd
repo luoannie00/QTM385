@@ -30,6 +30,8 @@ library(ranger)
 library(glmnet)
 library(naivebayes)
 library(mgcv)
+library(gbm)
+library(xgboost)
 #rm(list = ls())
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
@@ -549,6 +551,43 @@ FN_probT_oos<- mean(FN_probTree != p3_validFactored$p3_validYfactored)
 fourNine_result$ProbabilityTrees <- FN_probT_oos
 
 #Boosted Trees
+#Data prep
+p3_trainY_GBM <- p3p1_trainY
+p3_train_GBM <- data.frame(p3_trainX, p3_trainY_GBM)
+p3_validY_GBM <- p3p1_validY
+p3_valid_GBM <- data.frame(p3_validX, p3_validY_GBM)
+#ADA
+optimal_treeNum<-0
+optimal_err<-100000000
+treeNum <- seq(500, 3000, 500)
+for (i in 1:length(treeNum)){
+  ADAm <- gbm(p3_trainY_GBM ~ . , data = as.data.frame(p3_train_GBM), 
+              distribution = "bernoulli", n.trees = treeNum[i], cv.folds = 5)
+  temp_err <- mean(round(predict(ADAm, data = p3_train_GBM, n.trees = 60, type = "response")) 
+                   != p3_train_GBM$p3_trainY_GBM)
+  if (temp_err < optimal_err){
+      optimal_err<-temp_err
+      optimal_treeNum<-i
+  }
+}
+FN_ADA_classifier <- gbm(p3_trainY_GBM ~ . , data = as.data.frame(p3_train_GBM), 
+                         distribution = "bernoulli", n.trees = treeNum[optimal_treeNum], cv.folds = 5)
+FN_ADA_oos <- mean(round(predict(FN_ADA_classifier, newdata = p3_valid_GBM, n.trees = 60, 
+                                 type = "response")) != p3_valid_GBM$p3_validY_GBM)
+fourNine_result$ADA <- FN_ADA_oos
+
+
+
+train_y <- train$mpg
+train_x <- train
+train_x$mpg <- NULL
+test_x <- test
+test_x$mpg <- NULL
+xgboost1 <- xgboost(data = as.matrix(train_x), label = train_y, max.depth = 3, eta = 1, nrounds = 10000, objective = "binary:logistic", verbose = 0)
+#Get predictions and see misclass rate
+ada_err <- 1 - mean(round(predict(boost1, newdata = test, n.trees = 60, type = "response")) == test$mpg)
+xgb_err <- 1 - mean(round(predict(xgboost1, newdata = as.matrix(test_x))) == test$mpg)
+
 #Model Stacking
 
 ```
