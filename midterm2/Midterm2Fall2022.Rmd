@@ -364,8 +364,8 @@ For your chosen method, explain **why** it outperforms all other approaches. Thi
 Finally, present at least 4 examples of misclassified images. Could we ever expect a classification algorithm to get those images correct?
 
 ### Part 3 Solution
-We have used Logistic Regression, QDA, and NB w/ KDE for continuous predictors. As explained above, we will not use NB without KDE due to high dimensionality. Since there are only two classes--four and nine, we won't be using Multinomial logistic regression. We also won't be using KNN due to the curse of high dimentionality. We also won't be treating predictors as discrete for NB, since the variables are values on a gray scale which are continuous. For the same reason, we also won't be using Bayes' Theorem for discrete features.
-We will first continue our prediction with the lasso model we built before. Then, we will build new models using LDA, generalized additive LR, linearSVM, polySVM, radialSVM, and Random Forest (bagged trees, probability trees, boosted trees). We attempted the GAM for Logistic Regression, but since it's too computational expensive to try tensor ti() to capture interactions for all combinations, we decided to not continue using GAM for LR. We believe we didn't loose much info for not trying this method, since we already tried generalized methods of LDA and QDA (which captures interactions between different combinations of two variables).
+We have used Logistic Regression, QDA, and NB w/ KDE for continuous predictors. As explained above, we will not use NB without KDE due to high dimensionality. Since there are only two classes--four and nine, we won't be using Multinomial logistic regression. We also won't be using KNN due to the curse of high dimentionality. We've seen in the matrix created from the lasso problem that there seems to be a lot of pixels that are quite important in the prediction, so we won't use DANN either since we don't expect a huge reduction of dimensions. We also won't be treating predictors as discrete for NB, since the variables are values on a gray scale which are continuous. For the same reason, we also won't be using Bayes' Theorem for discrete features.
+We will first continue our prediction with the lasso model we built before. Then, we will build new models using LDA, generalized additive LR, linearSVM, polySVM, radialSVM, and tree methods (Bagging, Random Forest, Probability Trees, Boosted Trees). We also will try model stacking. We attempted the GAM for Logistic Regression, but since it's too computational expensive to try tensor ti() to capture interactions for all combinations, we decided to not continue using GAM for LR. We believe we didn't loose much info for not trying this method, since we already tried generalized methods of LDA and QDA (which captures interactions between different combinations of two variables).
 ```{r}
 #lasso
 p3_lvalidX <- as.matrix(p3_validX)
@@ -397,7 +397,8 @@ p3_validFactored <- data.frame(p3_validX, p3_validYfactored)
 optimal_cost<-0
 optimal_degree<-0
 optimal_epe<-1000000
-#Create a vector of potential C values. We set our cost in an exponential way so that the cost we try won't be too high that the model overfits, and there are more cost values between 0 and 1 that we would try. This is because we expect the optimal cost value to fall between 0 and 1 for good generalizability, and we want to test carefully which cost value exactly would be the optimal value through CV. This tuning method applies to linearSVM, polySVM, and radialSVM.
+#Create a vector of potential C values. 
+#We set our cost in an exponential way so that the cost we try won't be too high that the model overfits, and there are more cost values between 0 and 1 that we would try. This is because we expect the optimal cost value to fall between 0 and 1 for good generalizability, and we want to test carefully which cost value exactly would be the optimal value through CV. This tuning method applies to linearSVM, polySVM, and radialSVM.
 cost_vals <- exp(seq(-3,3,length = 30))
 for(i in 1:length(cost_vals)){
   #Train the SVM
@@ -472,7 +473,83 @@ FN_radialSVM <- predict(FN_radialSVM_classfier, newdata = p3_validFactored , typ
 FN_radialSVM_oos<- mean(FN_radialSVM != p3_validYfactored)
 fourNine_result$radialSVM <- FN_radialSVM_oos
 
-#tree methods
+#tree methods(bagging, random forest, probability trees, boosted trees)
+#data: y-var will also be factored. so we use same data we used in SVM.
+
+#Bagging
+FN_bagging_classifier <- ranger(p3_trainYfactored ~ . , data = p3_trainFactored, mtry =
+                                  ncol(p3_trainFactored) - 1, num.trees = 1000)
+FN_bagging <- predict(FN_bagging_classifier, data = p3_validFactored)$predictions
+FN_bagging_oos<- mean(FN_bagging != p3_validFactored$p3_validYfactored)
+fourNine_result$Bagging <- FN_bagging_oos
+#We believe that RF is likely to perform better than Bagging, and it's computationally expensive to grow trees. After conventionally picking a value of num.tree=1000 for bagging, we found that the oos EPE did not decrease significantly. So instead of tuning for num.trees, we decided to move onto RF.
+
+#Random Forest
+#optimal_varNum<-0
+#optimal_treeNum<-0
+#optimal_oob<-100000000
+#varNum <- seq(2,120,20) #too many var would be like bagging. but considering the high dimentionality of our x_train dataset, we decided to try a couple below 120.
+#treeNum <- seq(1000, 4000, 1000) #we wanted to tune treeNum too but don't want to spend too much time
+#for (i in 1:length(varNum)){
+  #for (j in 1:length(treeNum)){
+   # rfMod<-ranger(p3_trainYfactored ~ . , data = p3_trainFactored, num.trees = treeNum[j], 
+    #              importance = "permutation", mtry = varNum[i], classification = TRUE)
+    #temp_oob<-rfMod$prediction.error
+    #if (temp_oob < optimal_oob){
+     # optimal_oob<-temp_oob
+      #optimal_varNum<-i
+      #optimal_treeNum<-j
+    #}
+  #}
+#}
+#varNum[optimal_varNum] #22
+#treeNum[optimal_treeNum] #1000
+#Since it's too computationally expensive to run the above for loop, we commented out the tuning process.
+# finalized model
+FN_RF_classifier<-ranger(p3_trainYfactored ~ . , data = p3_trainFactored, num.trees = 1000, 
+                         importance = "permutation", mtry = 22, classification = TRUE)
+FN_RF <- predict(FN_RF_classifier, data = p3_validFactored)$predictions
+FN_RF_oos<- mean(FN_RF != p3_validFactored$p3_validYfactored)
+fourNine_result$RF <- FN_RF_oos
+
+#Probability Trees
+optimal_varNum<-0
+optimal_treeNum<-0
+optimal_oob<-100000000
+varNum <- seq(2,60,20) #too many var would be like bagging. but considering the high dimentionality of our x_train dataset, we decided to try a couple below 60.
+treeNum <- c(1000,2000) #we wanted to tune treeNum too but don't want to spend too much time
+for (i in 1:length(varNum)){
+  for (j in 1:2){
+    probTMod<-ranger(p3_trainYfactored ~ . , data = p3_trainFactored, num.trees = treeNum[j], 
+                  importance = "permutation", probability = TRUE, mtry = varNum[i], classification = TRUE)
+    temp_oob<-probTMod$prediction.error
+    if (temp_oob < optimal_oob){
+      optimal_oob<-temp_oob
+      optimal_varNum<-i
+      optimal_treeNum<-j
+    }
+  }
+}
+# finalized model
+FN_probT_classifier<-ranger(p3_trainYfactored ~ . , data = p3_trainFactored, 
+                            num.trees = treeNum[optimal_treeNum], importance = "permutation", 
+                            probability = TRUE, mtry = varNum[optimal_varNum], classification = TRUE)
+FN_probT <- predict(FN_probT_classifier, data = p3_validFactored)$predictions
+FN_probTree <- c()
+for (i in 1:3000){
+  if (FN_probT[i,1] > FN_probT[i,2]){
+    FN_probTree[i] = 4
+  }
+  else{
+    FN_probTree[i] = 9
+  }
+}
+FN_probTree <- factor(FN_probTree)
+FN_probT_oos<- mean(FN_probTree != p3_validFactored$p3_validYfactored)
+fourNine_result$ProbabilityTrees <- FN_probT_oos
+
+#Boosted Trees
+#Model Stacking
 
 ```
 
@@ -485,9 +562,6 @@ Points for this question will be given with respect to classification accuracy. 
 $$5 \times \frac{E_i}{E_{max}}$$
 
 ## Question 4 (25 pts.)
-
-Now, let's work with **three classes** - 3s, 5s, and 8s. Start by subsetting your training and validation sets to only include 3s, 5s and 8s.
-
 ## Question 4 Data
 ```{r}
 p4_trainX <- train_x[c(7501:10000, 12501:15000, 20001:22500),]
@@ -496,38 +570,8 @@ p4_validX <- validation_x[c(4501:6000, 7501:9000, 12001:13500),]
 p4_validY <- validation_y[c(4501:6000, 7501:9000, 12001:13500),]
 ```
 
-### Part 1 (25 pts.)
-
-Hidden among the 7500 3s, 5s, and 8s in the training set are 20 12 $\times$ 12 pixel images of sandals, sneakers, and ankle boots. These images are taken from another commonly used ML benchmarking data set called "Fashion MNIST". [Fashion MNIST](https://github.com/zalandoresearch/fashion-mnist) is an alternative data set used for classification method benchmarking that has uses pictures of shirts, bags, shoes, etc. rather than images of handwritten digits. Each of the 20 images are shown in the figures below:
-
-![](Shoes1.jpeg)
-
-![](Shoes2.jpeg)
-
-Using everything you've learned about classification methods in this class (and some intuition), come up with a method that finds these images in the training set.  At a minimum, create a plot of the most suspect "digits" that shows your best guesses as to the 20 anomalies.
-
-Your points for this problem will be wholly allocated as a function of your method.  There is **no perfect answer** for this problem.  As long as you put in some effort to find these images, you will get most (if not all) points for this part.  As such, please be sure to clearly explain your approach to this task.  I am eager to see what you all come up with!  This is a really abstract problem, so just try your best.
-
-Note that this is an example of **anomaly detection** - a subset of machine learning algorithms that intend to tell us when something in our data set is weird (or an outlier, if you like to use that kind of terminology).  This is a classification-*esque* problem as it would be easy to solve this if we had some labelled shoe images.  However, this training set doesn't include any appropriately labelled instances.
-
-Notes:
-
-  1. Part of what makes this task so challenging for this particular set of three digits is that 3s, 5s, and 8s look a lot alike!  This would be really easy for 0s and 1s because our classifiers are so well tuned for these digits.  This means that an approach that finds images close to the decision boundary for this classification problem will yield a mixture of really poorly written digits **and** the shoes.  This is a good starting point for creating your own approach, though!  You'll have to get creative to try to find things that really don't look like the other images in the data set.
-  
-  2. An initial thought may be to use instances from the fashion MNIST data set to train a "shoe/not shoe" classifier.  This will not work out-of-the-box because I have processed all of the original 28 x 28 images down to 12 x 12 images.  You are more than welcome to do this processing yourself if this is the route that you choose (though, I suggest not going this route as it kinda defeats the purpose of this problem).
-  
-  3. An approach that I highly recommend checking out is called a "one-class SVM".  Implementations of this approach exist in `ksvm` and `sklearn` in Python.  This approach differs from the SVM we covered in class as it uses a parameter `nu` rather than the cost.  Read the documentation on this method and apply it to drastically reduce the number of candidate images!  However, it's not guaranteed to return **all** of the shoe images.  You'll need to do a little work to get the rest.
-  
-  4. At a certain point, you may just want to use good old human checking to try to sort between bad digit images and shoe images.  Unless you're willing to commit a lot of time to labelling, just going through 7500 images one by one will not work.  However, looking at 30ish wouldn't take too long.  Use classification algorithms to find a few good candidates and sort through those to find your first few "shoe" images.
-  
-  5.  Once you've found a few shoes, think about creating a classifier.  Trees and SVMs are likely your best best for fitting a decision boundary with only a few observations in one specific class (e.g. just a few shoes).  One thing that will help here is to train a second classifier using a few "prototype" images - 3s, 5s, and 8s that are good examples of the digits and not the chicken-scratch that makes this problem so hard.
-  
-  6. Without using the knowledge of where the shoe images are, I was able to find 15 of the 20 images.  I, personally, had a hard time re-finding the images of the stiletto sandals because they look a lot like 5s!  
-  
-  7. I'm really eager to see your approaches here - this is a weird problem that requires a lot of thought.  But, I think that this is a good demonstration of how you might use the approaches we discussed in class to address atypical classification problems.
-
 ### Part 1 Solution
-From the observation of shoe pictures, we found that a commonality is that the 12th column has dark marks (most of them have all 12 rows filled at 12th column). The 3s, 5s, and 8s, however, are not likely to have the whole or most of 12th column filled. So we picked three points at the 12th column after transforming all observations to 12x12 matrices and tune a grayscale value to find as many shoes as possible for the first step.
+From the observation of shoe pictures, we found that a commonality is that the 12th column has dark marks. The 3s, 5s, and 8s, however, are not likely to have the whole or most of 12th column filled. So we picked three points at the 12th column after transforming all observations to 12x12 matrices and tuned a grayscale value to find as many shoes as possible.
 ```{r}
 shoes <- c()
 for (i in 1:7500){
@@ -540,7 +584,7 @@ for (i in 1:length(shoes)){
   plot_digit(x = p4_trainX[shoes[i],], bw = FALSE)
 }
 ```
-Now that we have found 18 shoes, we then matched those pictures with the ones given on the problem set, and we figured out the 2 shoes that are to be found. It makes sense that our previous method failed to identify those two since their 12th column, and more importantly, the middle part of the 12th column, was not oencil-marked. Again, we studied the characteristics of the 2 shoe pictures that are most different from number digits. For one shoe, both its upper-right corner and lower-left corner seem to be marked, which should be rare for digits. So let's try this condition.
+We then matched those pictures with the ones given and identified the remaining 2 shoes to be found. For one shoe, both its upper-right corner and lower-left corner seem to be marked, which should be rare for digits.
 ```{r}
 obs <- c()
 for (i in 1:7500){
@@ -553,12 +597,9 @@ for (i in 1:length(obs)){
   plot_digit(x = p4_trainX[obs[i],], bw = FALSE)
 }
 obs
-```
-After plotting, we see that 1244th obs is the shoe we wanted to find. We append this shoe to our shoes list.
-```{r}
 shoes <- append(1244, shoes)
 ```
-Now we only have one shoe left to find. We observe that its middle-left and two points on the right are marked. We reasoned that those three points may be more likely to be filled for digits too, so we start by setting a high value for grey-scale value.
+Now we only have one shoe left to find. We observe that its middle-left and two points on the right are marked. We reasoned that those three points may be more likely to be filled for digits too, so we start by setting a high grey-scale value.
 ```{r}
 obs <- c()
 for (i in 1:7500){
@@ -571,9 +612,6 @@ for (i in 1:length(obs)){
   plot_digit(x = p4_trainX[obs[i],], bw = FALSE)
 }
 obs
-```
-Looking at the pictures, we see that the second plot is the final shoe we wanted, which is the 2190th obs.
-```{r}
 shoes <- append(2190, shoes)
 for (i in 1:length(shoes)){
   plot_digit(x = p4_trainX[shoes[i],], bw = FALSE)
