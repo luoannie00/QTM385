@@ -32,6 +32,7 @@ library(naivebayes)
 library(mgcv)
 library(gbm)
 library(xgboost)
+library(SuperLearner)
 #rm(list = ls())
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
@@ -367,7 +368,7 @@ Finally, present at least 4 examples of misclassified images. Could we ever expe
 
 ### Part 3 Solution
 We have used Logistic Regression, QDA, and NB w/ KDE for continuous predictors. As explained above, we will not use NB without KDE due to high dimensionality. Since there are only two classes--four and nine, we won't be using Multinomial logistic regression. We also won't be using KNN due to the curse of high dimentionality. We've seen in the matrix created from the lasso problem that there seems to be a lot of pixels that are quite important in the prediction, so we won't use DANN either since we don't expect a huge reduction of dimensions. We also won't be treating predictors as discrete for NB, since the variables are values on a gray scale which are continuous. For the same reason, we also won't be using Bayes' Theorem for discrete features.
-We will first continue our prediction with the lasso model we built before. Then, we will build new models using LDA, generalized additive LR, linearSVM, polySVM, radialSVM, and tree methods (Bagging, Random Forest, Probability Trees, Boosted Trees). We also will try model stacking. We attempted the GAM for Logistic Regression, but since it's too computational expensive to try tensor ti() to capture interactions for all combinations, we decided to not continue using GAM for LR. We believe we didn't loose much info for not trying this method, since we already tried generalized methods of LDA and QDA (which captures interactions between different combinations of two variables).
+We will first continue our prediction with the lasso model we built before. Then, we will build new models using LDA, generalized additive LR, linearSVM, polySVM, radialSVM, and tree methods (Bagging, Random Forest, Probability Trees, Boosted Trees). We attempted the GAM for Logistic Regression, but since it's too computational expensive to try tensor ti() to capture interactions for all combinations, we decided to not continue using GAM for LR. We believe we didn't loose much info for not trying this method, since we already tried generalized methods of LDA and QDA (which captures interactions between different combinations of two variables).
 ```{r}
 #lasso
 p3_lvalidX <- as.matrix(p3_validX)
@@ -375,7 +376,9 @@ FN_lasso <- predict(p3_lasso, p3_lvalidX, type= "class")
 FN_lasso_oos <- mean(FN_lasso != p3_validY)
 FN_lasso_oos #0.03233333
 fourNine_result$lasso <- FN_lasso_oos
+```
 
+```{r}
 #LDA
 FN_LDA_classifier <- lda(p3_trainY ~ ., data=p3_train)
 FN_LDA <- predict(FN_LDA_classifier,p3_validX)$class
@@ -387,7 +390,9 @@ fourNine_result$LDA <- FN_LDA_oos
 #write all Xvariables in spline
 #form <- as.formula(paste("p3p1_trainY~",paste("s(",names(p3_trainX),")",collapse="+")))
 #FN_GAM <- gam(formula = form, data = p3_logTrain, family = binomial(link = 'logit'))
+```
 
+```{r}
 #SVM data prep
 p3_trainYfactored <- factor(p3_trainY)
 p3_trainFactored <- data.frame(p3_trainX, p3_trainYfactored)
@@ -474,7 +479,10 @@ FN_radialSVM_classfier <- ksvm(p3_trainYfactored ~ . , data = p3_trainFactored, 
 FN_radialSVM <- predict(FN_radialSVM_classfier, newdata = p3_validFactored , type = "response")
 FN_radialSVM_oos<- mean(FN_radialSVM != p3_validYfactored)
 fourNine_result$radialSVM <- FN_radialSVM_oos
+cost <- optimal_cost
+```
 
+```{r}
 #tree methods(bagging, random forest, probability trees, boosted trees)
 #data: y-var will also be factored. so we use same data we used in SVM.
 
@@ -487,38 +495,32 @@ fourNine_result$Bagging <- FN_bagging_oos
 #We believe that RF is likely to perform better than Bagging, and it's computationally expensive to grow trees. After conventionally picking a value of num.tree=1000 for bagging, we found that the oos EPE did not decrease significantly. So instead of tuning for num.trees, we decided to move onto RF.
 
 #Random Forest
-#optimal_varNum<-0
-#optimal_treeNum<-0
-#optimal_oob<-100000000
-#varNum <- seq(2,120,20) #too many var would be like bagging. but considering the high dimentionality of our x_train dataset, we decided to try a couple below 120.
-#treeNum <- seq(1000, 4000, 1000) #we wanted to tune treeNum too but don't want to spend too much time
-#for (i in 1:length(varNum)){
-  #for (j in 1:length(treeNum)){
-   # rfMod<-ranger(p3_trainYfactored ~ . , data = p3_trainFactored, num.trees = treeNum[j], 
-    #              importance = "permutation", mtry = varNum[i], classification = TRUE)
-    #temp_oob<-rfMod$prediction.error
-    #if (temp_oob < optimal_oob){
-     # optimal_oob<-temp_oob
-      #optimal_varNum<-i
-      #optimal_treeNum<-j
-    #}
-  #}
-#}
-#varNum[optimal_varNum] #22
-#treeNum[optimal_treeNum] #1000
-#Since it's too computationally expensive to run the above for loop, we commented out the tuning process.
-# finalized model
-FN_RF_classifier<-ranger(p3_trainYfactored ~ . , data = p3_trainFactored, num.trees = 1000, 
-                         importance = "permutation", mtry = 22, classification = TRUE)
+optimal_varNum<-0
+optimal_treeNum<-0
+optimal_oob<-100000000
+varNum <- c(2:8, 20, 60, 100) #too many var would be like bagging. but considering the high dimentionality of our x_train dataset, we decided to try a couple below 100.
+for (i in 1:length(varNum)){
+  rfMod<-ranger(p3_trainYfactored ~ . , data = p3_trainFactored, num.trees = 1000, 
+                importance = "permutation", mtry = varNum[i], classification = TRUE)
+  temp_oob<-rfMod$prediction.error
+  if (temp_oob < optimal_oob){
+    optimal_oob<-temp_oob
+    optimal_varNum<-i
+  }
+}
+FN_RF_classifier<-ranger(p3_trainYfactored ~ . , data = p3_trainFactored, 
+                         num.trees = 1000, importance = "permutation", 
+                         mtry = varNum[optimal_varNum], classification = TRUE)
 FN_RF <- predict(FN_RF_classifier, data = p3_validFactored)$predictions
 FN_RF_oos<- mean(FN_RF != p3_validFactored$p3_validYfactored)
 fourNine_result$RF <- FN_RF_oos
+rf_MTRY <- varNum[optimal_varNum]
 
 #Probability Trees
 optimal_varNum<-0
 optimal_treeNum<-0
 optimal_oob<-100000000
-varNum <- seq(2,60,20) #too many var would be like bagging. but considering the high dimentionality of our x_train dataset, we decided to try a couple below 60.
+varNum <- c(2:8, 20, 60, 100)
 treeNum <- c(1000,2000) #we wanted to tune treeNum too but don't want to spend too much time
 for (i in 1:length(varNum)){
   for (j in 1:2){
@@ -556,6 +558,7 @@ p3_trainY_GBM <- p3p1_trainY
 p3_train_GBM <- data.frame(p3_trainX, p3_trainY_GBM)
 p3_validY_GBM <- p3p1_validY
 p3_valid_GBM <- data.frame(p3_validX, p3_validY_GBM)
+
 #ADA
 optimal_treeNum<-0
 optimal_err<-100000000
@@ -563,8 +566,9 @@ treeNum <- seq(500, 3000, 500)
 for (i in 1:length(treeNum)){
   ADAm <- gbm(p3_trainY_GBM ~ . , data = as.data.frame(p3_train_GBM), 
               distribution = "bernoulli", n.trees = treeNum[i], cv.folds = 5)
-  temp_err <- mean(round(predict(ADAm, data = p3_train_GBM, n.trees = 60, type = "response")) 
-                   != p3_train_GBM$p3_trainY_GBM)
+  #we use validation data to calculate temp_err to prevent overfit
+  temp_err <- mean(round(predict(ADAm, newdata = p3_valid_GBM, n.trees = 60, type = "response")) 
+                   != p3_valid_GBM$p3_validY_GBM)
   if (temp_err < optimal_err){
       optimal_err<-temp_err
       optimal_treeNum<-i
@@ -576,21 +580,72 @@ FN_ADA_oos <- mean(round(predict(FN_ADA_classifier, newdata = p3_valid_GBM, n.tr
                                  type = "response")) != p3_valid_GBM$p3_validY_GBM)
 fourNine_result$ADA <- FN_ADA_oos
 
-
-
-train_y <- train$mpg
-train_x <- train
-train_x$mpg <- NULL
-test_x <- test
-test_x$mpg <- NULL
-xgboost1 <- xgboost(data = as.matrix(train_x), label = train_y, max.depth = 3, eta = 1, nrounds = 10000, objective = "binary:logistic", verbose = 0)
-#Get predictions and see misclass rate
-ada_err <- 1 - mean(round(predict(boost1, newdata = test, n.trees = 60, type = "response")) == test$mpg)
-xgb_err <- 1 - mean(round(predict(xgboost1, newdata = as.matrix(test_x))) == test$mpg)
-
-#Model Stacking
-
+#XGB
+xgb_trainY <- p3p1_trainY #coded in {0,1}
+xgb_train <- data.frame(p3_trainX, xgb_trainY)
+xgb_train$xgb_trainY <- NULL
+xgb_validY <- p3p1_validY #coded in {0,1}
+xgb_valid <- data.frame(p3_validX, p3p1_validY)
+xgb_valid$p3p1_validY <- NULL
+depth <- seq(2,20,2)
+learn_rate <- seq(0.1,1,0.1)
+treeNum <- seq(50, 15000, 3000)
+optimal_depth<-0
+optimal_learn_rate<-0
+optimal_treeNum<-0
+optimal_err<-100000000
+#waited 8 hours. don't run this!!
+for (i in 1:length(depth)){
+  for (j in 1:length(learn_rate)){
+    for (k in 1:length(treeNum)){
+      xgbMod <- xgboost(data = as.matrix(xgb_train), label = xgb_trainY, max.depth = depth[i], 
+                        eta = learn_rate[j], nrounds = treeNum[k], 
+                        objective = "binary:logistic", verbose = 0)
+      #we use validation data to calculate temp_err to prevent overfit
+      temp_err <- mean(round(predict(xgbMod, newdata = as.matrix(xgb_valid))) != xgb_validY)
+      if (temp_err < optimal_err){
+        optimal_err<-temp_err
+        optimal_treeNum<-k
+        optimal_learn_rate<-j
+        optimal_depth<-i
+      }
+    }
+  }
+}
+depth[optimal_depth] #8
+learn_rate[optimal_learn_rate] #0.2
+treeNum[optimal_treeNum] #3050
+#finalized model
+FN_xgb_classifier <- xgboost(data = as.matrix(xgb_train), label = xgb_trainY, 
+                             max.depth = depth[optimal_depth], eta = learn_rate[optimal_learn_rate], 
+                             nrounds = treeNum[optimal_treeNum], 
+                        objective = "binary:logistic", verbose = 0)
+FN_xgb_oos <- mean(round(predict(xgbMod, newdata = as.matrix(xgb_valid))) != xgb_validY)
+fourNine_result$xgb <- FN_xgb_oos
 ```
+
+```{r}
+fourNine_result
+fourNine_result[which.min(fourNine_result)]
+```
+We can see that polySVM performed the best. 解释没写。比我辛辛苦苦跑的ada和xgb都好一大些lol
+
+```{r}
+for (k in 1:length(FN_polySVM)) {
+  if (FN_polySVM[k] != p3_validYfactored[k]){
+    print(k) #misclassified: 371, 1240, 2025, 2734
+  }
+}
+p3_validYfactored[371] #4
+plot_digit(x = p3_validX[371,], bw = FALSE, main = "True Class = 4")
+p3_validYfactored[1240] #4
+plot_digit(x = p3_validX[1240,], bw = FALSE, main = "True Class = 4")
+p3_validYfactored[2025] #9
+plot_digit(x = p3_validX[2025,], bw = FALSE, main = "True Class = 4")
+p3_validYfactored[2734] #9
+plot_digit(x = p3_validX[2734,], bw = FALSE, main = "True Class = 4")
+```
+It makes sense that the above 4 images are misclassified--each digit does look like it belongs to the opposite class. However, I think images 1 and 4 may have a chance of being classified correctly, if those two images are oriented more towards the center line and thus less slanted.
 
 ### Part 4 (5 pts.)
 
@@ -598,7 +653,15 @@ Use the hidden test set to generate a prediction for each included image. Your p
 
 Points for this question will be given with respect to classification accuracy. Let $E_i$ be the proportion of observations in the test set (that are actually 4s and 9s) that are correctly classified. Let $E_{max}$ be the maximum proportion of correctly classified observations across the class. Then, your final point total for this part will be:
 
+
+
 $$5 \times \frac{E_i}{E_{max}}$$
+### Part 4 Solution
+```{r}
+test_y$label <- predict(FN_polySVM_classfier, newdata=test_x)
+write.csv(as.matrix(test_y), file='Q3Predictions.csv', row.names=FALSE)
+```
+
 
 ## Question 4 (25 pts.)
 ## Question 4 Data
