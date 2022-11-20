@@ -46,7 +46,7 @@ test_x <- read.csv('MNISTTestXRand.csv')
 test_y <- read.csv("MNISTTestYRand.csv")
 validation_x <- read.csv('MNISTValidationX.csv')
 validation_y <- read.csv('MNISTValidationY.csv')
-# plot function
+# plot function from instruction
 plot_digit <- function(x, bw = FALSE,...){
   if(sqrt(length(x)) != round(sqrt(length(x)))){
     stop(print("Not a square image! Something is wrong here."))
@@ -60,6 +60,7 @@ plot_digit <- function(x, bw = FALSE,...){
 }
 #Example
 plot_digit(x = train_x[1,], bw = FALSE, main = "True Class = 0") #x vector length = square of integer
+# bw= TRUE: round up pixel to black or white
 plot_digit(x = train_x[1,], bw = TRUE, main = "True Class = 0")
 ```
 
@@ -69,7 +70,7 @@ Collaborators: Billy Ge, Latifa Tan, Annie Luo
 ## Question 1 (15 pts.)
 ### Part 1 Solution
 ```{r}
-train_y[50,] #0
+train_y[50,] #image label 0
 plot_digit(x = train_x[50,], bw = FALSE, main = "True Class = 0")
 train_y[1500,] #0
 plot_digit(x = train_x[1500,], bw = FALSE, main = "True Class = 0")
@@ -104,6 +105,7 @@ for (j in 1:10){
 }
 ```
 解释还没写
+Class for label 6 and 8 seem to show the most within class variation over images; class for label 1 and 0 seem to show the least within class variation over images.
 
 
 ### Part 3 Solution
@@ -113,6 +115,7 @@ for (j in 1:10){
 ## Question 2 (15 pts.)
 ## Question 2 Data
 ```{r}
+#subset data to only include 0s and 1s
 p2_trainX <- train_x[1:5000,]
 p2_trainY <- train_y[1:5000,]
 p2_validX <- validation_x[1:3000,]
