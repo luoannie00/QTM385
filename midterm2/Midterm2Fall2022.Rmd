@@ -108,7 +108,7 @@ Class for label 4,5,6,8, and 9 seem to show the most within class variation over
 
 
 ### Part 3 Solution
-Euclidean distance between each obs. to mean. need to code this 解释没写完
+We use euclidean distance between each obs. to means of each classes as our measure of similarity. Since there are certain classes that have large variation within the class (4,5,6,8,9), the classes with large variances are going to be difficult to tell apart. The zero-one pair will be easy since those classes have low variances.
 
 
 ## Question 2 (15 pts.)
@@ -181,9 +181,7 @@ zeroOne_result <- data.frame("In Sample" = p2p1_epe, "OOS" = p2p1_oos)
 zeroOne_result
 ```
 The in-sample EPE and oos PE are both extremely small. Our model has great predictive capabilities.
-It's easy to find separators between 0 and 1, which makes LR shine, because LR draws simple linear boundaries.
-
-Logistic regression calculates the probability of digit 1 given all the pixel values of each image. Since 0 and 1 are very different images visually, the logistic regression is capable of classifying them easily.
+It's easy to find separators between 0 and 1, which makes LR shine, because LR draws simple linear boundaries and thus has high precision. Logistic regression calculates the probability of digit 1 given all the pixel values of each image. Since 0 and 1 are very different images visually, the logistic regression is capable of classifying them easily.
 
 ```{r}
 countMs #there are 6 misclassifications: 271, 1057, 2203, 2259, 2311, 2555
@@ -359,7 +357,7 @@ FN_naiveBayes_oos #0.16
 fourNine_result$NaiveBayes <- FN_naiveBayes_oos
 fourNine_result
 ```
-We can see that logistic regression has the best performance, while NB has the worst. It makes sense that NaiveBayes does not perform very well, since when one pixel has pencil marks, it's likely that the pixels around it are marked too, which violates the independence assumption required by NB. QDA relies on the multivariate normal density (MND) assumption where, for each class, the predictors are drawn from a multivariate normal density function. In other words, QDA assumes that the marginal distribution of predictors are normal. With this assumption, QDA models $\log( \frac{Pr(Y=k | X=x)}{Pr(Y=K | X=x)})$ in a quadratic way in the sense that it allows interaction of pairs of predictors. It makes sense that it outperforms NB due to high correlation between pixels.  Logistic regression maps probabilities from 0 to 1. 解释没写完(assumpt of LR & why LR is the best)
+We can see that logistic regression has the best performance, while NB has the worst. It makes sense that NaiveBayes does not perform very well, since when one pixel has pencil marks, it's likely that the pixels around it are marked too, which violates the independence assumption required by NB. QDA relies on the multivariate normal density (MND) assumption where, for each class, the predictors are drawn from a multivariate normal density function. In other words, QDA assumes that the marginal distribution of predictors are normal. With this assumption, QDA models $\log( \frac{Pr(Y=k | X=x)}{Pr(Y=K | X=x)})$ in a quadratic way in the sense that it allows interaction of pairs of predictors. It makes sense that it outperforms NB due to high correlation between pixels. However, our data does not conform well to QDA's assumed MND distribution of features, because most of our pixels are either 250 (pencil-marked) or 0 (not marked), rather than distributed on a continuous scale. LR, on the other hand, assumes Bernoulli distribution of the outcome variable, which our data conforms to since our possible outcomes zero and one is represented via a 2-class categorical variable.
 
 
 ### Part 3 Solution
@@ -614,7 +612,7 @@ fourNine_result$xgb <- FN_xgb_oos
 fourNine_result
 fourNine_result[which.min(fourNine_result)]
 ```
-We can see that polySVM performed the best. 解释没写。比ada和xgb都好一大些lol
+We can see that polySVM performed the best. radialSVM performed worse probably becuase we did not tune the width of the kernal hyperparameter since we didn't think it's computationally beneficial. SVM performed better than trees since tree methods still have a weak assumption of the starting search point. In our case, our tree methods have found a local minimum, but may not have found the global minimum, making trees perform worse than the truly assumption-free SVMs. For qda, lda, NB, lasso, and LR, they all performed worse because their assumptions about distributions, about features or outcomes, or about shape of decision boundaries were not properly fulfilled by our dataset. Therefore, they performed worse than our assumption-free SVM.
 
 ```{r}
 for (k in 1:length(FN_polySVM)) {
@@ -889,8 +887,15 @@ probTree <- factor(probTree)
 probT_oos<- mean(probTree != valid_factored$valid_yFactored)
 result$ProbabilityTrees <- probT_oos
 end.time <- Sys.time()
+
+#computation time
 time.taken <- end.time - start.time
 result$time.taken <- time.taken
+```
+As we can see, polySVM has the lowest oos EPE, as expected due to reasons explained in the fourNine problem. So we decided to go with polySVM as our final model
+
+```{r p5finalModel}
+polySVM_classfier
 ```
 
 ### Part 2 (5 pts.)
@@ -901,10 +906,8 @@ For the most commonly confused digit pairs, plot examples that are misclassified
 
 The MNIST data as presented to you has been simplified in some ways. There are also other data cleaning tasks that can improve predictive accuracy. What are some steps that could be taken in the data cleaning stage that would help your chosen method improve its misclassification rate?
 
-### Part 3 (5 pts.)
-
-Use the hidden test set to generate a prediction for each included image. Your predictions should be stored in a matrix that has the image key as the first column and the integer value of the class in the second column. Save this matrix as `Q5Predictions.csv` and include it with your final submission.
-
-Points for this question will be given with respect to classification accuracy. Let $E_i$ be the proportion of observations in the test set misclassified. Let $E_{min}$ be the minimum proportion of misclassified observations across the class. Then, you final point total for this part will be:
-
-$$5 \times \frac{E_{max}}{E_i}$$
+### Part 3 Solution
+```{r}
+test_y$label <- predict(polySVM_classfier, newdata=test_x, type = "response")
+write.csv(as.matrix(test_y), file='Q5Predictions.csv', row.names=FALSE)
+```
