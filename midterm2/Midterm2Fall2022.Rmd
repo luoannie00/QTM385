@@ -108,6 +108,49 @@ Class for label 4,5,6,8, and 9 seem to show the most within class variation over
 
 
 ### Part 3 Solution
+```{r}
+# function to identify similarity using euclidean
+# input: sample observation[one row/list] with 144 vectors 
+# output: a table with the similarity between THE observation and [0-9]
+ob<-train_x[1,]
+sim_check<-function(ob,source){
+  # mean_train
+  df <- data.frame(expand.grid(0:9, 1), stringsAsFactors = F)
+  names(df)=c("integer","similarity")
+  for (i in 1:10){
+    temp_sum<-0
+    check_num<-mean_train[i,]
+    for (j in 1:144){
+      check_num<-mean_train[i,]
+      if (source=="trainSet"){
+        intOB<-ob[j][,1]
+      }
+      if (source=="avgSet"){
+        intOB<-ob[j]
+      }
+      intCheck<-check_num[j]
+      temp_sum<-temp_sum+(intOB-intCheck)^2
+    }
+    df[i,2]<-temp_sum
+  }
+  return(df)
+}
+# example: when we input the first observation in the dataset(from class==0), we could get its similarity table with each integer(base on the average from last question)
+observation_similarity<-sim_check(ob,"trainSet")
+observation_similarity
+
+# if it make sense: find the most similar distinct number for each integer
+#   e.g. find integer among[1-9] that is most similar with 0
+avg_similarity<- data.frame(expand.grid(0:9, 1), stringsAsFactors = F)
+names(avg_similarity)=c("integer","top_similar_num")
+for (i in 1:10){
+  check_int<-mean_train[i,]
+  temp_df<-sim_check(check_int,"avgSet")
+  temp_df<-temp_df[-c(i),]
+  avg_similarity[i,2]<-temp_df[which.min(temp_df$similarity),1]
+}
+avg_similarity
+```
 We use euclidean distance between each obs. to means of each classes as our measure of similarity. Since there are certain classes that have large variation within the class (4,5,6,8,9), the classes with large variances are going to be difficult to tell apart. The zero-one pair will be easy since those classes have low variances.
 
 
