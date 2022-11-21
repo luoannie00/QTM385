@@ -741,24 +741,6 @@ for (i in 1:length(shoes)){
 
 ## Question 5 (20 pts.)
 
-Finally, let's work with the full MNIST data set. This is a 10 class classification problem that has been studied extensively. With your work on this problem, you will join the club of data scientists who have taken a crack at one of machine learning's most infamous classification tasks!
-
-### Part 1 (10 pts.)
-
-Use any tools in our classification arsenal to try to minimize the expected misclassification rate for out of sample handwritten digits.
-
-In your answer, you should benchmark any algorithms that are suited for the problem. For any classification methods that you know will not work well (by virtue of the structure of the data), justify why it's not worth the time to check it. Be sure to explain your method for tuning any hyperparameters.
-
-For any models you run, produce a table that shows the misclassification rate on the validation set. Similarly, record the compute time needed to arrive at your final model (including any hyperparameter tuning) and include this in the same table. See [this StackOverflow thread](https://stackoverflow.com/questions/6262203/measuring-function-execution-time-in-r) for an elementary way to do this in R.
-
-Which model performs the best on the 10 class problem? Why do you think this model performs the best? Compare your approach to other possible approaches when answering this question.
-
-Is the tradeoff in accuracy vs. compute time worth the gain in realistic scenarios? Think about how these algorithms might scale as $N$ and $P$ get larger. Specifically, discuss the problem of hyperparameter tuning and how this might contribute to difficulty in implementing your chosen approach.
-
-For one-off classification problems, the computational time may not matter. However, there is significant research into the area of **online classification algorithms** - algorithms in which new predictions can be made quickly using existing data and the classification algorithm can be updated using new training data as it arrives. See [this Wikipedia page](https://en.wikipedia.org/wiki/Online_machine_learning) for more information on this topic.
-
-**WARNING!**  SVMs will be very competitive on this problem.  However, the compute time needed to train them will be very high.  As always, I expect that you will tune the cost parameter for any SVM.  So, even more compute time!  To mitigate this, you are encouraged to subset the data for SVMs (and trees if you're really running into problems).  I think that a reasonable size is 500 per class.  You can also reduce the number of cost tuning parameters that you check, though I highly recommend trying cost values that are both small, medium (around 1), and large.  Trees are much more scalable, so I think you'll be able to use the full data for those.  
-
 ### Part 1 Solution
 Since there are 10 classes, logistic regression (which is suited for 2 classes) doesn't really work. Instead, we will start with multinomial logistic regression. Then we will try LASSO. For the same reason for the fourNine problem, we are not going to use GAM, Bayes for discrete features, NB with discrete features. And for the same reason of high dimentionality, we won't be using NB w/o KDE or KNN.
 We will be using MLR, LASSO, LDA, QDA, NB w/ continuous variable w/ KDE, 2 SVM methods (we are not using linear SVM for the same reason as fourNine problem), and tree methods. We won't be using bagging since RF is likely to outperfom bagging. Also, to save computation time, we don't tune num.trees since from our previous experiences, the change in num.trees usually don't change oos EPE too much.
@@ -941,13 +923,48 @@ As we can see, polySVM has the lowest oos EPE, as expected due to reasons explai
 polySVM_classfier
 ```
 
-### Part 2 (5 pts.)
+### Part 2 Solution
 
-For your final model, compute a **confusion matrix** for the validation set that shows how often each digit is classified in each class. Which incorrect classifications happen most frequently?
+```{r}
+pred_class_countRate<- data.frame(expand.grid(0:9, 0,0,0,0,0,0,0,0,0,0),
+                                  stringsAsFactors = F)
+names(pred_class_countRate)=c("trueValueBelow","0","1","2","3","4","5","6","7","8","9")
 
-For the most commonly confused digit pairs, plot examples that are misclassified. What aspect of these images led to their misclassification?
+predYClass <- predict(polySVM_classfier, newdata = valid_factored, type = "response")
 
-The MNIST data as presented to you has been simplified in some ways. There are also other data cleaning tasks that can improve predictive accuracy. What are some steps that could be taken in the data cleaning stage that would help your chosen method improve its misclassification rate?
+check1<-FALSE
+check2<-FALSE
+
+for (i in 1: length(predYClass)){
+  row_num<-as.numeric(valid_factored$valid_yFactored[i])
+  col_num<-as.numeric(predYClass[i])+1
+  if (check1== FALSE & row_num == 8 & col_num== 11 ){# pull out example for next part
+      sample79<- i
+      check1<-TRUE
+  }
+  if (check2==FALSE & row_num ==10 & col_num==6){# pull out example for next part
+    sample49<-i
+    check2<-TRUE
+  }
+  pred_class_countRate[row_num,col_num]<-pred_class_countRate[row_num,col_num]+1
+}
+```
+
+4&9(sample49) and 7&9(sample79) are the most often misclassified pairs
+The following are two example we pull out from the code above.
+
+potential aspects of misclassification:
+For 7-9 misclassification, the hand-written 7 is a bit too curve-in on its left end.
+For 4-9 misclassification, the location of the "circle" is a bit confusing for the model.[maybe the model consider circle part on the right side as a sign of 4-ness]
+
+potential steps to improve in data cleaning stage:
+1) improve on the digit-orientation algorithm
+2) don't reduce the pixel to 12*12 and sacrifice some run-time for the quality
+
+```{r}
+plot_digit(x = validation_x[sample49,], bw = FALSE, main = "True Class = 9")
+plot_digit(x = validation_x[sample79,], bw = FALSE, main = "True Class = 7")
+```
 
 ### Part 3 Solution
 ```{r}
