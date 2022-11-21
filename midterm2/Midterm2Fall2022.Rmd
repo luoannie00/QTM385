@@ -32,7 +32,7 @@ library(naivebayes)
 library(mgcv) #GAM
 library(gbm)
 library(xgboost)
-library(SuperLearner)
+library(dplyr)
 #rm(list = ls())
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
@@ -104,12 +104,11 @@ for (j in 1:10){
   plot_digit(x = mean_train[j,], bw = FALSE)
 }
 ```
-解释还没写
-Class for label 6 and 8 seem to show the most within class variation over images; class for label 1 and 0 seem to show the least within class variation over images.
+Class for label 4,5,6,8, and 9 seem to show the most within class variation over images; class for label 1 and 0 seem to show the least within class variation over images.
 
 
 ### Part 3 Solution
-解释还没写
+Euclidean distance between each obs. to mean. need to code this 解释没写完
 
 
 ## Question 2 (15 pts.)
@@ -182,7 +181,7 @@ zeroOne_result <- data.frame("In Sample" = p2p1_epe, "OOS" = p2p1_oos)
 zeroOne_result
 ```
 The in-sample EPE and oos PE are both extremely small. Our model has great predictive capabilities.
-intuitive解释没写(Logistic regression predicts probabilities between 0 and 1, which are exactly the two classes we're trying to predict here. So logistic regressions is a perfect choice here.)
+It's easy to find separators between 0 and 1, which makes LR shine, because LR draws simple linear boundaries.
 
 Logistic regression calculates the probability of digit 1 given all the pixel values of each image. Since 0 and 1 are very different images visually, the logistic regression is capable of classifying them easily.
 
@@ -721,21 +720,23 @@ For one-off classification problems, the computational time may not matter. Howe
 
 ### Part 1 Solution
 Since there are 10 classes, logistic regression (which is suited for 2 classes) doesn't really work. Instead, we will start with multinomial logistic regression. Then we will try LASSO. For the same reason for the fourNine problem, we are not going to use GAM, Bayes for discrete features, NB with discrete features. And for the same reason of high dimentionality, we won't be using NB w/o KDE or KNN.
-We will be using MLR, LASSO, LDA, QDA, NB w/ continuous variable w/ KDE, 3 SVM methods, and tree methods.
+We will be using MLR, LASSO, LDA, QDA, NB w/ continuous variable w/ KDE, 2 SVM methods (we are not using linear SVM for the same reason as fourNine problem), and tree methods. We won't be using bagging since RF is likely to outperfom bagging. Also, to save computation time, we don't tune num.trees since from our previous experiences, the change in num.trees usually don't change oos EPE too much.
 ```{r MLR}
+start.time <- Sys.time()
 #Factored Data
 train_factored <- train_x
 train_factored$train_yFactored <- factor(train_y$label)
 valid_factored <- validation_x
-valid_factored$test_yFactored <- factor(validation_y$label)
+valid_factored$valid_yFactored <- factor(validation_y$label)
 
-#MLR 我不知道这儿哪儿错了 就是不run
-multiLogistic_classifier <- multinom(train_yFactored ~., data = train_factored, trace = FALSE)
+#MLR
+multiLogistic_classifier <- nnet::multinom(train_yFactored ~., data = train_factored, 
+                                     trace = FALSE, MaxNWts = 80000)
 multiLog_pred<-predict(multiLogistic_classifier, newdata =valid_factored)
 multiLog_oos<- mean(multiLog_pred != valid_factored$test_yFactored)
 result <- data.frame("Multinomial LR" = multiLog_oos)
-```
-```{r lasso}
+
+
 #lasso
 lasso_TrainX <- data.matrix(train_x)
 lasso_TrainY <- data.matrix(train_y)
@@ -748,9 +749,9 @@ lasso_classifier <- glmnet(x=lasso_TrainX, y=lasso_TrainY, family="multinomial",
 lasso <- predict(lasso_classifier, lasso_validX, type= "class")
 lasso_oos <- mean(lasso != validation_y)
 result$lasso <- lasso_oos
-```
 
-```{r LDA,QDA,NB}
+
+#data prep
 train <- data.frame(train_x, "train_y" = train_y$label)
 #LDA
 LDA_classifier <- lda(train_y ~ ., data=train)
@@ -768,41 +769,16 @@ naiveBayes_classifier<-naive_bayes(as.character(train$train_y) ~ ., data=train, 
 naiveBayes <- predict(naiveBayes_classifier, validation_x, type= "class")
 naiveBayes_oos <- mean(naiveBayes != validation_y$label)
 result$NaiveBayes <- naiveBayes_oos
-```
 
-```{r SVM}
+
+
 #SVM data prep
-#train_factored
-#train_factored$train_yFactored
+#subsetted data
+set.seed(456)
+sam_train_factored <- train_factored %>% group_by(train_yFactored) %>% slice_sample(n=500)
+#sam_train_factored$train_yFactored
 #valid_factored
 #valid_factored$test_yFactored
-
-#linearSVM
-# to find optimal cost and degree
-optimal_cost<-0
-optimal_degree<-0
-optimal_epe<-1000000
-#Create a vector of potential C values. 
-#We set our cost in an exponential way so that the cost we try won't be too high that the model overfits, and there are more cost values between 0 and 1 that we would try. This is because we expect the optimal cost value to fall between 0 and 1 for good generalizability, and we want to test carefully which cost value exactly would be the optimal value through CV. This tuning method applies to linearSVM, polySVM, and radialSVM.
-cost_vals <- exp(seq(-3,3,length = 30))
-for(i in 1:length(cost_vals)){
-  #Train the SVM
-  svm1 <- ksvm(train_yFactored ~ . , data = train_factored, type = "C-svc", kernel = "vanilladot", 
-                C = cost_vals[i], cross = 5, prob.model = TRUE, kpar = list())
-  #Extract the 5fold CV est and store
-  temp <- kernlab::cross(svm1)
-  if (temp<optimal_epe){
-    optimal_epe<-temp
-    optimal_cost<-cost_vals[i]
-  }
-}
-# finalized model
-linearSVM_classfier <- ksvm(train_yFactored ~ . , data = train_factored, type = "C-svc", 
-                               kernel = "vanilladot", C = optimal_cost, cross = 5, prob.model = TRUE, 
-                               kpar = list())
-linearSVM <- predict(linearSVM_classfier, newdata = valid_factored , type = "response")
-linearSVM_oos<- mean(linearSVM != valid_factored$train_yFactored)
-result$linearSVM <- linearSVM_oos
 
 #polySVM
 # to find optimal cost and degree
@@ -810,10 +786,11 @@ optimal_cost<-0
 optimal_degree<-0
 optimal_epe<-1000000
 cost_vals <- exp(seq(-3,3,length = 30))
+#We set our cost in an exponential way so that the cost we try won't be too high that the model overfits, and there are more cost values between 0 and 1 that we would try. This is because we expect the optimal cost value to fall between 0 and 1 for good generalizability, and we want to test carefully which cost value exactly would be the optimal value through CV. This tuning method applies to polySVM and radialSVM.
 for (j in 2:3){ #conventionally 2nd or 3rd degree polynomial would be enough
   for(i in 1:length(cost_vals)){
     #Train the SVM
-    svm2 <- ksvm(train_yFactored ~ . , data = train_factored, type = "C-svc", kernel = "polydot", 
+    svm2 <- ksvm(train_yFactored ~ . , data = sam_train_factored, type = "C-svc", kernel = "polydot", 
                  kpar = list(degree = j), C = cost_vals[i], cross = 5, prob.model = TRUE)
     #Extract the 5fold CV est and store
     temp <- kernlab::cross(svm2)
@@ -825,11 +802,11 @@ for (j in 2:3){ #conventionally 2nd or 3rd degree polynomial would be enough
   }
 }
 # finalized model
-polySVM_classfier <- ksvm(train_yFactored ~ . , data = train_factored, type = "C-svc", 
+polySVM_classfier <- ksvm(train_yFactored ~ . , data = sam_train_factored, type = "C-svc", 
                              kernel = "polydot", kpar = list(degree = optimal_degree), C = optimal_cost,
                              cross = 5, prob.model = TRUE)
 polySVM <- predict(polySVM_classfier, newdata = valid_factored, type = "response")
-polySVM_oos<- mean(polySVM != valid_factored$train_yFactored)
+polySVM_oos<- mean(polySVM != valid_factored$valid_yFactored)
 result$polySVM <- polySVM_oos
 
 #radialSVM
@@ -841,7 +818,7 @@ optimal_epe<-1000000
 cost_vals <- exp(seq(-3,3,length = 30))
 for(i in 1:length(cost_vals)){
   #Train the SVM
-  svm3 <- ksvm(train_yFactored ~ . , data = train_factored, type = "C-svc", kernel = "rbfdot", 
+  svm3 <- ksvm(train_yFactored ~ . , data = sam_train_factored, type = "C-svc", kernel = "rbfdot", 
                 C = cost_vals[i], cross = 5, prob.model = TRUE)
   #Extract the 5fold CV est and store
   temp <- kernlab::cross(svm3)
@@ -851,14 +828,14 @@ for(i in 1:length(cost_vals)){
   }
 }
 # finalized model
-radialSVM_classfier <- ksvm(train_yFactored ~ . , data = train_factored, type = "C-svc", 
+radialSVM_classfier <- ksvm(train_yFactored ~ . , data = sam_train_factored, type = "C-svc", 
                             kernel = "rbfdot", C = optimal_cost, cross = 5, prob.model = TRUE)
 radialSVM <- predict(radialSVM_classfier, newdata = valid_factored, type = "response")
-radialSVM_oos<- mean(radialSVM != valid_factored$train_yFactored)
+radialSVM_oos<- mean(radialSVM != valid_factored$valid_yFactored)
 result$radialSVM <- radialSVM_oos
-```
 
-```{r tree}
+
+
 #tree methods(bagging, random forest, probability trees, boosted trees)
 #data: y-var will also be factored.
 #train_factored
@@ -866,70 +843,54 @@ result$radialSVM <- radialSVM_oos
 #valid_factored
 #valid_factored$test_yFactored
 
-#Bagging
-bagging_classifier <- ranger(train_yFactored ~ . , data = train_factored, mtry =
-                                  ncol(p3_trainFactored) - 1, num.trees = 1000)
-bagging <- predict(bagging_classifier, data = valid_factored)$predictions
-bagging_oos<- mean(bagging != valid_factored$train_yFactored)
-result$Bagging <- bagging_oos
-
 #Random Forest
 optimal_varNum<-0
 optimal_treeNum<-0
 optimal_oob<-100000000
-varNum <- c(2:8, 20, 60, 100) #too many var would be like bagging. but considering the high dimentionality of our x_train dataset, we decided to try a couple below 100.
+varNum <- c(2,8,20) #too many var would be like bagging. but considering the high dimentionality of our x_train dataset, we decided to try a couple below 20.
 for (i in 1:length(varNum)){
   rfMod<-ranger(train_yFactored ~ . , data = train_factored, num.trees = 1000, 
-                importance = "permutation", mtry = varNum[i], classification = TRUE)
+                mtry = varNum[i], classification = TRUE)
   temp_oob<-rfMod$prediction.error
   if (temp_oob < optimal_oob){
     optimal_oob<-temp_oob
     optimal_varNum<-i
   }
 }
-RF_classifier<-ranger(train_yFactored ~ . , data = train_factored, 
-                         num.trees = 1000, importance = "permutation", 
-                         mtry = varNum[optimal_varNum], classification = TRUE)
+RF_classifier<-ranger(train_yFactored ~ . , data = train_factored, num.trees = 1000, 
+                      mtry = varNum[optimal_varNum], classification = TRUE)
 RF <- predict(RF_classifier, data = valid_factored)$predictions
-RF_oos<- mean(RF != valid_factored$train_yFactored)
+RF_oos<- mean(RF != valid_factored$valid_yFactored)
 result$RF <- RF_oos
 
 #Probability Trees
 optimal_varNum<-0
 optimal_treeNum<-0
 optimal_oob<-100000000
-varNum <- c(2:8, 20, 60, 100)
-treeNum <- c(1000,2000) #we wanted to tune treeNum too but don't want to spend too much time
+varNum <- c(2,8,20)
 for (i in 1:length(varNum)){
-  for (j in 1:2){
-    probTMod<-ranger(train_yFactored ~ . , data = train_factored, num.trees = treeNum[j], 
-                  importance = "permutation", probability = TRUE, mtry = varNum[i], 
-                  classification = TRUE)
-    temp_oob<-probTMod$prediction.error
-    if (temp_oob < optimal_oob){
-      optimal_oob<-temp_oob
-      optimal_varNum<-i
-      optimal_treeNum<-j
-    }
+  probTMod<-ranger(train_yFactored ~ . , data = train_factored, num.trees = 1000, 
+                  probability = TRUE, mtry = varNum[i], classification = TRUE)
+  temp_oob<-probTMod$prediction.error
+  if (temp_oob < optimal_oob){
+    optimal_oob<-temp_oob
+    optimal_varNum<-i
   }
 }
 # finalized model
-probT_classifier<-ranger(train_yFactored ~ . , data = train_factored, 
-                            num.trees = treeNum[optimal_treeNum], importance = "permutation", 
-                            probability = TRUE, mtry = varNum[optimal_varNum], classification = TRUE)
+probT_classifier<-ranger(train_yFactored ~ . , data = train_factored, num.trees = 1000,
+                          probability = TRUE, mtry = varNum[optimal_varNum], classification = TRUE)
 probT <- predict(probT_classifier, data = valid_factored)$predictions
 probTree <- c()
 for (i in 1:15000){
-  if (probT[i,1] > probT[i,2]){
-    probTree[i] = 4
-  }
-  else{
-    probTree[i] = 9
-  }
+  probTree[i] <- which.max(probT[i,]) -1
 }
 probTree <- factor(probTree)
-probT_oos<- mean(probTree != valid_factored$train_yFactored)
+probT_oos<- mean(probTree != valid_factored$valid_yFactored)
 result$ProbabilityTrees <- probT_oos
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+result$time.taken <- time.taken
 ```
 
 ### Part 2 (5 pts.)
