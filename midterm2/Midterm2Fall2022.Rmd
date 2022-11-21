@@ -21,15 +21,15 @@ urlcolor: blue
 library(ggplot2)
 library(tidyverse)
 library(data.table)
-library(kernlab)
-library(MASS)
-library(nnet)
+library(kernlab) #KSVM
+library(MASS) #QDA
+library(nnet) #MultiNom
 library(FNN)
 library(splitTools)
 library(ranger)
-library(glmnet)
+library(glmnet) #Ridge&LASSO
 library(naivebayes)
-library(mgcv)
+library(mgcv) #GAM
 library(gbm)
 library(xgboost)
 library(SuperLearner)
@@ -47,12 +47,12 @@ test_y <- read.csv("MNISTTestYRand.csv")
 validation_x <- read.csv('MNISTValidationX.csv')
 validation_y <- read.csv('MNISTValidationY.csv')
 # plot function from instruction
-plot_digit <- function(x, bw = FALSE,...){
-  if(sqrt(length(x)) != round(sqrt(length(x)))){
+plot_digit <- function(x, bw = FALSE,...) {
+  if(sqrt(length(x)) != round(sqrt(length(x)))) {
     stop(print("Not a square image! Something is wrong here."))
   }
   n <- sqrt(length(x))
-  if(bw == TRUE){
+  if(bw == TRUE) {
     x <- as.numeric(x > 50)*256
   }
   par(pty = "s")
@@ -113,6 +113,7 @@ Class for label 6 and 8 seem to show the most within class variation over images
 
 
 ## Question 2 (15 pts.)
+
 ## Question 2 Data
 ```{r}
 #subset data to only include 0s and 1s
@@ -171,16 +172,19 @@ for (j in 1:length(logistic_valid)){
 #Count of Misclassifications
 for (k in 1:length(logistic_valid)) {
   if (logistic_valid[k] != p2_validY[k]){
-    print(k) #misclassified: 271, 1057, 2203, 2259, 2311, 2555
+    #print(k) misclassified: 271, 1057, 2203, 2259, 2311, 2555
     countMs = countMs + 1
   }
 }
 p2p1_oos <- countMs / length(logistic_valid)
 p2p1_oos #0.002
 zeroOne_result <- data.frame("In Sample" = p2p1_epe, "OOS" = p2p1_oos)
+zeroOne_result
 ```
 The in-sample EPE and oos PE are both extremely small. Our model has great predictive capabilities.
 intuitive解释没写(Logistic regression predicts probabilities between 0 and 1, which are exactly the two classes we're trying to predict here. So logistic regressions is a perfect choice here.)
+
+Logistic regression calculates the probability of digit 1 given all the pixel values of each image. Since 0 and 1 are very different images visually, the logistic regression is capable of classifying them easily.
 
 ```{r}
 countMs #there are 6 misclassifications: 271, 1057, 2203, 2259, 2311, 2555
@@ -300,7 +304,8 @@ for (k in 1:length(logistic_valid)) {
 }
 p3p1_oos <- countMs / length(logistic_valid)
 p3p1_oos #0.035
-fourNine_result <- data.frame("Logistic" = p3p1_oos)
+fourNine_result <- data.frame("In sample logistic"=p3p1_epe, 'OOS logistic'=p3p1_oos)
+fourNine_result
 ```
 The four-nine classification's in-sample EPE is 0.0508, while oos EPE is 0.035. The EPE is ten times larger than zero-one classification. The results differ mainly because four and nine naturally look much similar than zero and one do.
 
@@ -334,7 +339,7 @@ cf1 <- colnames(p3_trainX)
 names(p3_corr) <- cf1
 matrix(nrow = 12, ncol = 12, p3_corr, byrow = TRUE)
 ```
-One big difference is that four-nine has much more important pixels for classification than zero-one. This conforms to our intuition that, because it's harder to tell four and nine apart, we need more features to predict the class. The upper center is concentrated with 1, signaling four. The lower center is full of -1, signaling nine.
+One big difference is that four-nine has much more important pixels for classification than zero-one. This conforms to our intuition that, because it's harder to tell four and nine apart, we need more features to predict the class. The upper center is concentrated with 1 in a semi- circular shape, signaling the top half of nine. The lower center(row 8) is largely concentrated with -1, signaling the horizontal line in the bottom of four.
 
 ### Part 2 Solution
 ```{r}
@@ -376,12 +381,7 @@ FN_LDA_classifier <- lda(p3_trainY ~ ., data=p3_train)
 FN_LDA <- predict(FN_LDA_classifier,p3_validX)$class
 FN_LDA_oos <- mean(FN_LDA != p3_validY)
 fourNine_result$LDA <- FN_LDA_oos 
-#we can see that LDA performs slightly better than QDA, so we believe that LDA is appropriate in the Four-Nine problem, where QDA has a little less precision. This is not surprising because we expected very unclean cuts as Four and Nine look very similar.
-
-#Generalized Additive LR
-#write all Xvariables in spline
-#form <- as.formula(paste("p3p1_trainY~",paste("s(",names(p3_trainX),")",collapse="+")))
-#FN_GAM <- gam(formula = form, data = p3_logTrain, family = binomial(link = 'logit'))
+#we can see that LDA performs slightly better than QDA, so we believe that LDA is appropriate in the Four-Nine problem, where QDA has a little less precision. This is not surprising because we expected very unclean cuts as Four and Nine look very similar. Hence, instead of the unclean cut provided by QDA, a simpler linear decision boundary in high dimension space might have a better performance, as suggested by LDA.
 ```
 
 ```{r}
@@ -478,12 +478,7 @@ fourNine_result$radialSVM <- FN_radialSVM_oos
 #data: y-var will also be factored. so we use same data we used in SVM.
 
 #Bagging
-FN_bagging_classifier <- ranger(p3_trainYfactored ~ . , data = p3_trainFactored, mtry =
-                                  ncol(p3_trainFactored) - 1, num.trees = 1000)
-FN_bagging <- predict(FN_bagging_classifier, data = p3_validFactored)$predictions
-FN_bagging_oos<- mean(FN_bagging != p3_validFactored$p3_validYfactored)
-fourNine_result$Bagging <- FN_bagging_oos
-#We believe that RF is likely to perform better than Bagging, and it's computationally expensive to grow trees. After conventionally picking a value of num.tree=1000 for bagging, we found that the oos EPE did not decrease significantly. So instead of tuning for num.trees, we decided to move onto RF.
+#Since random forest increases variance between trees, it strictly dominates bagging trees. Hence we start off with random forest.
 
 #Random Forest
 optimal_varNum<-0
@@ -492,7 +487,7 @@ optimal_oob<-100000000
 varNum <- c(2:8, 20, 60, 100) #too many var would be like bagging. but considering the high dimentionality of our x_train dataset, we decided to try a couple below 100.
 for (i in 1:length(varNum)){
   rfMod<-ranger(p3_trainYfactored ~ . , data = p3_trainFactored, num.trees = 1000, 
-                importance = "permutation", mtry = varNum[i], classification = TRUE)
+                mtry = varNum[i], classification = TRUE)
   temp_oob<-rfMod$prediction.error
   if (temp_oob < optimal_oob){
     optimal_oob<-temp_oob
@@ -500,34 +495,33 @@ for (i in 1:length(varNum)){
   }
 }
 FN_RF_classifier<-ranger(p3_trainYfactored ~ . , data = p3_trainFactored, 
-                         num.trees = 1000, importance = "permutation", 
-                         mtry = varNum[optimal_varNum], classification = TRUE)
+                         num.trees = 1000, mtry = varNum[optimal_varNum], 
+                         classification = TRUE)
 FN_RF <- predict(FN_RF_classifier, data = p3_validFactored)$predictions
 FN_RF_oos<- mean(FN_RF != p3_validFactored$p3_validYfactored)
 fourNine_result$RF <- FN_RF_oos
+```
 
+
+```{r}
 #Probability Trees
 optimal_varNum<-0
 optimal_treeNum<-0
 optimal_oob<-100000000
 varNum <- c(2:8, 20, 60, 100)
-treeNum <- c(1000,2000) #we wanted to tune treeNum too but don't want to spend too much time
 for (i in 1:length(varNum)){
-  for (j in 1:2){
-    probTMod<-ranger(p3_trainYfactored ~ . , data = p3_trainFactored, num.trees = treeNum[j], 
-                  importance = "permutation", probability = TRUE, mtry = varNum[i], classification = TRUE)
-    temp_oob<-probTMod$prediction.error
-    if (temp_oob < optimal_oob){
-      optimal_oob<-temp_oob
-      optimal_varNum<-i
-      optimal_treeNum<-j
-    }
+  probTMod<-ranger(p3_trainYfactored ~ . , data = p3_trainFactored, num.trees = 1000,
+                   probability = TRUE, mtry = varNum[i], classification = TRUE)
+  temp_oob<-probTMod$prediction.error
+  if (temp_oob < optimal_oob){
+    optimal_oob<-temp_oob
+    optimal_varNum<-i
   }
 }
 # finalized model
 FN_probT_classifier<-ranger(p3_trainYfactored ~ . , data = p3_trainFactored, 
-                            num.trees = treeNum[optimal_treeNum], importance = "permutation", 
-                            probability = TRUE, mtry = varNum[optimal_varNum], classification = TRUE)
+                            num.trees = 1000, probability = TRUE, 
+                            mtry = varNum[optimal_varNum], classification = TRUE)
 FN_probT <- predict(FN_probT_classifier, data = p3_validFactored)$predictions
 FN_probTree <- c()
 for (i in 1:3000){
@@ -541,7 +535,10 @@ for (i in 1:3000){
 FN_probTree <- factor(FN_probTree)
 FN_probT_oos<- mean(FN_probTree != p3_validFactored$p3_validYfactored)
 fourNine_result$ProbabilityTrees <- FN_probT_oos
+```
 
+
+```{r}
 #Boosted Trees
 #Data prep
 p3_trainY_GBM <- p3p1_trainY
