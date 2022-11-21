@@ -538,81 +538,81 @@ fourNine_result$ProbabilityTrees <- FN_probT_oos
 ```{r}
 #Boosted Trees
 #Data prep
-p3_trainY_GBM <- p3p1_trainY
-p3_train_GBM <- data.frame(p3_trainX, p3_trainY_GBM)
-p3_validY_GBM <- p3p1_validY
-p3_valid_GBM <- data.frame(p3_validX, p3_validY_GBM)
+#p3_trainY_GBM <- p3p1_trainY
+#p3_train_GBM <- data.frame(p3_trainX, p3_trainY_GBM)
+#p3_validY_GBM <- p3p1_validY
+#p3_valid_GBM <- data.frame(p3_validX, p3_validY_GBM)
 
 #ADA
-optimal_treeNum<-0
-optimal_err<-100000000
-treeNum <- seq(500, 3000, 500)
-for (i in 1:length(treeNum)){
-  ADAm <- gbm(p3_trainY_GBM ~ . , data = as.data.frame(p3_train_GBM), 
-              distribution = "bernoulli", n.trees = treeNum[i], cv.folds = 5)
+#optimal_treeNum<-0
+#optimal_err<-100000000
+#treeNum <- seq(500, 3000, 500)
+#for (i in 1:length(treeNum)){
+  #ADAm <- gbm(p3_trainY_GBM ~ . , data = as.data.frame(p3_train_GBM), 
+    #          distribution = "bernoulli", n.trees = treeNum[i], cv.folds = 5)
   #we use validation data to calculate temp_err to prevent overfit
-  temp_err <- mean(round(predict(ADAm, newdata = p3_valid_GBM, n.trees = 60, type = "response")) 
-                   != p3_valid_GBM$p3_validY_GBM)
-  if (temp_err < optimal_err){
-      optimal_err<-temp_err
-      optimal_treeNum<-i
-  }
-}
-FN_ADA_classifier <- gbm(p3_trainY_GBM ~ . , data = as.data.frame(p3_train_GBM), 
-                         distribution = "bernoulli", n.trees = treeNum[optimal_treeNum], cv.folds = 5)
-FN_ADA_oos <- mean(round(predict(FN_ADA_classifier, newdata = p3_valid_GBM, n.trees = 60, 
-                                 type = "response")) != p3_valid_GBM$p3_validY_GBM)
-fourNine_result$ADA <- FN_ADA_oos
+  #temp_err <- mean(round(predict(ADAm, newdata = p3_valid_GBM, n.trees = 60, type = "response")) 
+   #                != p3_valid_GBM$p3_validY_GBM)
+  #if (temp_err < optimal_err){
+   #   optimal_err<-temp_err
+    #  optimal_treeNum<-i
+  #}
+#}
+#FN_ADA_classifier <- gbm(p3_trainY_GBM ~ . , data = as.data.frame(p3_train_GBM), 
+ #                        distribution = "bernoulli", n.trees = treeNum[optimal_treeNum], cv.folds = 5)
+#FN_ADA_oos <- mean(round(predict(FN_ADA_classifier, newdata = p3_valid_GBM, n.trees = 60, 
+ #                                type = "response")) != p3_valid_GBM$p3_validY_GBM)
+#fourNine_result$ADA <- FN_ADA_oos
 
 #XGB
-xgb_trainY <- p3p1_trainY #coded in {0,1}
-xgb_train <- data.frame(p3_trainX, xgb_trainY)
-xgb_train$xgb_trainY <- NULL
-xgb_validY <- p3p1_validY #coded in {0,1}
-xgb_valid <- data.frame(p3_validX, p3p1_validY)
-xgb_valid$p3p1_validY <- NULL
-depth <- seq(2,20,2)
-learn_rate <- seq(0.1,1,0.1)
-treeNum <- seq(50, 15000, 3000)
-optimal_depth<-0
-optimal_learn_rate<-0
-optimal_treeNum<-0
-optimal_err<-100000000
+#xgb_trainY <- p3p1_trainY #coded in {0,1}
+#xgb_train <- data.frame(p3_trainX, xgb_trainY)
+#xgb_train$xgb_trainY <- NULL
+#xgb_validY <- p3p1_validY #coded in {0,1}
+#xgb_valid <- data.frame(p3_validX, p3p1_validY)
+#xgb_valid$p3p1_validY <- NULL
+#depth <- seq(2,20,2)
+#learn_rate <- seq(0.1,1,0.1)
+#treeNum <- seq(50, 15000, 3000)
+#optimal_depth<-0
+#optimal_learn_rate<-0
+#optimal_treeNum<-0
+#optimal_err<-100000000
 #waited 8 hours. don't run this!!
-for (i in 1:length(depth)){
-  for (j in 1:length(learn_rate)){
-    for (k in 1:length(treeNum)){
-      xgbMod <- xgboost(data = as.matrix(xgb_train), label = xgb_trainY, max.depth = depth[i], 
-                        eta = learn_rate[j], nrounds = treeNum[k], 
-                        objective = "binary:logistic", verbose = 0)
+#for (i in 1:length(depth)){
+ # for (j in 1:length(learn_rate)){
+  #  for (k in 1:length(treeNum)){
+   #   xgbMod <- xgboost(data = as.matrix(xgb_train), label = xgb_trainY, max.depth = depth[i], 
+    #                    eta = learn_rate[j], nrounds = treeNum[k], 
+     #                   objective = "binary:logistic", verbose = 0)
       #we use validation data to calculate temp_err to prevent overfit
-      temp_err <- mean(round(predict(xgbMod, newdata = as.matrix(xgb_valid))) != xgb_validY)
-      if (temp_err < optimal_err){
-        optimal_err<-temp_err
-        optimal_treeNum<-k
-        optimal_learn_rate<-j
-        optimal_depth<-i
-      }
-    }
-  }
-}
-depth[optimal_depth] #8
-learn_rate[optimal_learn_rate] #0.2
-treeNum[optimal_treeNum] #3050
+      #temp_err <- mean(round(predict(xgbMod, newdata = as.matrix(xgb_valid))) != xgb_validY)
+      #if (temp_err < optimal_err){
+       # optimal_err<-temp_err
+        #optimal_treeNum<-k
+        #optimal_learn_rate<-j
+        #optimal_depth<-i
+      #}
+    #}
+  #}
+#}
+#depth[optimal_depth] #8
+#learn_rate[optimal_learn_rate] #0.2
+#treeNum[optimal_treeNum] #3050
 #finalized model
-FN_xgb_classifier <- xgboost(data = as.matrix(xgb_train), label = xgb_trainY, 
-                             max.depth = depth[optimal_depth], eta = learn_rate[optimal_learn_rate], 
-                             nrounds = treeNum[optimal_treeNum], 
-                        objective = "binary:logistic", verbose = 0)
-FN_xgb_oos <- mean(round(predict(xgbMod, newdata = as.matrix(xgb_valid))) != xgb_validY)
-fourNine_result$xgb <- FN_xgb_oos
+#FN_xgb_classifier <- xgboost(data = as.matrix(xgb_train), label = xgb_trainY, 
+ #                            max.depth = depth[optimal_depth], eta = learn_rate[optimal_learn_rate], 
+  #                           nrounds = treeNum[optimal_treeNum], 
+   #                     objective = "binary:logistic", verbose = 0)
+#FN_xgb_oos <- mean(round(predict(xgbMod, newdata = as.matrix(xgb_valid))) != xgb_validY)
+#fourNine_result$xgb <- FN_xgb_oos
 ```
 
 ```{r}
 fourNine_result
 fourNine_result[which.min(fourNine_result)]
 ```
-We can see that polySVM performed the best. radialSVM performed worse probably becuase we did not tune the width of the kernal hyperparameter since we didn't think it's computationally beneficial. SVM performed better than trees since tree methods still have a weak assumption of the starting search point. In our case, our tree methods have found a local minimum, but may not have found the global minimum, making trees perform worse than the truly assumption-free SVMs. For qda, lda, NB, lasso, and LR, they all performed worse because their assumptions about distributions, about features or outcomes, or about shape of decision boundaries were not properly fulfilled by our dataset. Therefore, they performed worse than our assumption-free SVM.
+We can see that polySVM performed the best. radialSVM performed worse probably becuase we did not tune the width of the kernal hyperparameter since we didn't think it's computationally beneficial. SVM performed better than trees since tree methods still have a weak assumption of the starting search point. In our case, our tree methods have found a local minimum, but may not have found the global minimum, making trees perform worse than the truly assumption-free SVMs. For qda, lda, NB, lasso, and LR, they all performed worse because their assumptions about distributions, about features or outcomes, or about shape of decision boundaries were not properly fulfilled by our dataset. Therefore, they performed worse than our assumption-free SVM. While we tried boosted trees, we may have done a bad job at tuning the hyperparameters, resulting in high oos EPE for boosted trees. We commented out the boosted tree methods since they took very long to run.
 
 ```{r}
 for (k in 1:length(FN_polySVM)) {
