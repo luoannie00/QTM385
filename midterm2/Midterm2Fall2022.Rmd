@@ -1,15 +1,19 @@
 ---
-title: "Midterm Data Exercise #2 - Classification"
+title: 'Midterm Data Exercise #2 - Classification'
 author: "Kevin McAlister"
 date: "`r Sys.Date()`"
 output:
+  html_document:
+    df_print: paged
+    toc: no
+    toc_depth: '2'
   pdf_document:
     toc: no
     toc_depth: '2'
   prettydoc::html_pretty:
     df_print: kable
-    theme: leonids
     highlight: github
+    theme: leonids
     toc: no
     toc_depth: 2
     toc_float:
@@ -33,7 +37,7 @@ library(mgcv) #GAM
 library(gbm)
 library(xgboost)
 library(dplyr)
-#rm(list = ls())
+rm(list = ls())
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 ```
 
